@@ -1,0 +1,2 @@
+-Xsycl-target-backend
+--cuda-gpu-arch=sm_86
