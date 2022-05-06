@@ -1,3 +1,0 @@
-# CompileFlags:   
-# 	Add:
-# 			- --cuda-gpu-arch=sm_52

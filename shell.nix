@@ -1,7 +1,14 @@
 let 
    pkgs =
-    import (fetchTarball
-      https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz) {};
+   import (builtins.fetchGit {
+     # Descriptive name to make the store path easier to identify
+     name = "nixos-unstable-2022-05-06";
+     url = "https://github.com/nixos/nixpkgs/";
+     # Commit hash for nixos-unstable as of 2018-09-12
+     # `git ls-remote https://github.com/nixos/nixpkgs nixos-unstable`
+     ref = "refs/heads/nixos-unstable";
+     #rev = "c777cdf5c564015d5f63b09cc93bef4178b19b01";
+   }) {};
 in 
 pkgs.stdenv.mkDerivation {
    name = "cuda-env-shell";
