@@ -1,7 +1,7 @@
 #include <iostream>
 
 #define N 1024
-#define PARTITION_SIZE 32
+#define WARP_SIZE 32
 #define WINDOW 3
 
 #define FLAG_BLOCK 1 << 0
@@ -12,62 +12,93 @@ typedef struct  {
     int flag;
     float aggregate;
     float inclusive_prefix;
+    float prefix;
 } partition_state;
 
 
+__device__ float binOp(float a, float b) {
+    return a + b;
+}
+
 // base_ptr should point to the first element of the array which inside the partition
-__device__ int reduction(float *base_ptr) {
-    // int warpId = threadIdx.x / 32;
-    float sum = 0;
-    for (int i = 0; i < PARTITION_SIZE; i++) 
-        sum = sum + base_ptr[i];
+__device__ int reduction(float *base_ptr, int warp_i) {
+    float sum = base_ptr[warp_i];
+    // see https://people.maths.ox.ac.uk/gilesm/cuda/lecs/lec4.pdf
+    for (int i=1; i< WARP_SIZE; i*=2)
+        sum = binOp(sum, __shfl_xor_sync(0xffffff, sum, i));
     return sum;
 }
 
-__global__ void vector_add(float *a, partition_state *state) {
-    int t = threadIdx.x;
-    float* base_ptr = &a[t * PARTITION_SIZE];
+__device__ void scan(float *base_ptr, int warp_i) {
+    // see https://people.maths.ox.ac.uk/gilesm/cuda/lecs/lec4.pdf
 
-    int sum = reduction(base_ptr);
-
-    state[t].aggregate = sum;
-    state[t].flag = FLAG_AGGREGATE;
-    
-    if (t == 0) {
-        state[t].inclusive_prefix = sum;
-        state[t].flag = FLAG_INCLUSIVEP_PREFIX;
-    } 
-
-    float prefix = 0;
-    while (state[t].flag & FLAG_AGGREGATE) {
-        // float withPrefix = 0;
-        prefix = 0;
-        for (int i = t - 1; i > -1 && i > t - WINDOW - 1; i--) {
-            if (state[i].flag == FLAG_BLOCK)
-                break;
-            else if (state[i].flag & FLAG_AGGREGATE)
-                prefix += state[i].aggregate;
-            else {
-                prefix = prefix + state[i].inclusive_prefix;
-                state[t].inclusive_prefix = prefix + state[t].aggregate;
-                __threadfence();
-                state[t].flag = FLAG_INCLUSIVEP_PREFIX;
-                break;
-            }
-        }
+    int temp1 = base_ptr[warp_i];
+    for (int d=1; d<32; d<<=1) {
+        int temp2 = __shfl_up_sync(0xffffff, temp1, d);
+        if (warp_i >= d) temp1 = binOp(temp1, temp2); 
     }
 
-    base_ptr[0] = base_ptr[0] + prefix;
-    for (int i = 1; i < PARTITION_SIZE; i++) 
-        base_ptr[i] = base_ptr[i] + base_ptr[i - 1];
-    __syncthreads();
+    base_ptr[warp_i] = temp1;
+}
+
+__global__ void vector_add(float *a, partition_state *state) {
+    // Setup indexes
+    int partition_index = threadIdx.x / WARP_SIZE;
+    int warp_i = threadIdx.x % 32;
+    bool partition_head = warp_i == 0;
+
+    // Setup Pointers
+    float* base_ptr = &a[partition_index * WARP_SIZE];
+
+    // Compute  and  record the  partition-wide aggregate
+    int sum = reduction(base_ptr, warp_i);
+
+    if (partition_head) {
+
+        state[partition_index].aggregate = sum;
+        state[partition_index].flag = FLAG_AGGREGATE;
+        
+        if (partition_index == 0) {
+            state[partition_index].inclusive_prefix = sum;
+            state[partition_index].flag = FLAG_INCLUSIVEP_PREFIX;
+        } 
+    }
+
+    // Determine the partition’s exclusive prefix using decoupledlook-back
+    float prefix = 0;
+    if (!partition_head)
+        while (state[partition_index].flag & FLAG_AGGREGATE) {
+            prefix = 0;
+            for (int i = partition_index - 1; i > -1 && i > partition_index - WINDOW - 1; i--) {
+                if (state[i].flag == FLAG_BLOCK)
+                    break;
+                else if (state[i].flag & FLAG_AGGREGATE) {
+                    prefix += state[i].aggregate;
+                }
+                else {
+                    prefix = prefix + state[i].inclusive_prefix;
+                    
+                    // Compute and record the partition-wide inclusive prefixes.
+
+                    state[partition_index].prefix = prefix;
+                    state[partition_index].inclusive_prefix = prefix + state[partition_index].aggregate;
+                    __threadfence();
+                    state[partition_index].flag = FLAG_INCLUSIVEP_PREFIX;
+                    break;
+                }
+            }
+        }
+
+    __syncwarp();
+    scan(base_ptr, warp_i);
+    base_ptr[warp_i] = binOp(base_ptr[warp_i], state[partition_index].prefix);
 }
 
 int main(){
     float *a;
     partition_state *state;
 
-    int num_partition = N / PARTITION_SIZE;
+    int num_partition = N / WARP_SIZE;
 
     // Allocate memory
     auto error = cudaMallocManaged(&state, sizeof(partition_state) * num_partition);
@@ -87,7 +118,7 @@ int main(){
     // }
     // Main function
     std::cout << "Start kernel"<< std::endl;
-    vector_add<<<1,num_partition>>>(a,state);
+    vector_add<<<1,N>>>(a,state);
     error = cudaDeviceSynchronize();
     std::cout << cudaGetErrorString(error);
 
