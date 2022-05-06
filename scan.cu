@@ -1,7 +1,7 @@
 #include <iostream>
 
-#define N 4000
-#define PARTITION_SIZE 4
+#define N 1024
+#define PARTITION_SIZE 32
 #define WINDOW 3
 
 #define FLAG_BLOCK 1 << 0
@@ -14,13 +14,21 @@ typedef struct  {
     float inclusive_prefix;
 } partition_state;
 
-__global__ void vector_add(volatile float *a, volatile partition_state *state) {
-    int t = threadIdx.x;
-    volatile float* base_ptr = &a[t * PARTITION_SIZE];
 
+// base_ptr should point to the first element of the array which inside the partition
+__device__ int reduction(float *base_ptr) {
+    // int warpId = threadIdx.x / 32;
     float sum = 0;
     for (int i = 0; i < PARTITION_SIZE; i++) 
         sum = sum + base_ptr[i];
+    return sum;
+}
+
+__global__ void vector_add(float *a, partition_state *state) {
+    int t = threadIdx.x;
+    float* base_ptr = &a[t * PARTITION_SIZE];
+
+    int sum = reduction(base_ptr);
 
     state[t].aggregate = sum;
     state[t].flag = FLAG_AGGREGATE;
@@ -42,7 +50,7 @@ __global__ void vector_add(volatile float *a, volatile partition_state *state) {
             else {
                 prefix = prefix + state[i].inclusive_prefix;
                 state[t].inclusive_prefix = prefix + state[t].aggregate;
-                // memfence
+                __threadfence();
                 state[t].flag = FLAG_INCLUSIVEP_PREFIX;
                 break;
             }
