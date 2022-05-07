@@ -28,7 +28,7 @@ __device__ void scan(float *base_ptr, int warp_i) {
 
 __global__ void scan_lookback(float *a, partition_state *state) {
     // Setup indexes
-    int partition_index = (blockIdx.x * 1024) + threadIdx.x / WARP_SIZE;
+    int partition_index = ((blockIdx.x * 1024) + threadIdx.x) / WARP_SIZE;
     int warp_i = threadIdx.x % 32;
     bool partition_head = warp_i == 0;
 
@@ -45,6 +45,7 @@ __global__ void scan_lookback(float *a, partition_state *state) {
         
         if (partition_index == 0) {
             state[partition_index].inclusive_prefix = sum;
+            __threadfence();
             state[partition_index].flag = FLAG_INCLUSIVEP_PREFIX;
         } 
     }
@@ -52,7 +53,8 @@ __global__ void scan_lookback(float *a, partition_state *state) {
     // Determine the partition’s exclusive prefix using decoupledlook-back
     float prefix = 0;
     if (!partition_head)
-        while (state[partition_index].flag & FLAG_AGGREGATE) {
+        while (state[partition_index].flag == FLAG_AGGREGATE) {
+            __threadfence();
             prefix = 0;
             for (int i = partition_index - 1; i > -1 && i > partition_index - WINDOW - 1; i--) {
                 if (state[i].flag == FLAG_BLOCK)
@@ -75,6 +77,7 @@ __global__ void scan_lookback(float *a, partition_state *state) {
         }
 
     __syncwarp();
+    // printf("finished partition_index %d\n", partition_index);
     scan(base_ptr, warp_i);
     base_ptr[warp_i] = binOp(base_ptr[warp_i], state[partition_index].prefix);
 }

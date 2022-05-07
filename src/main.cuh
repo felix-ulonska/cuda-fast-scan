@@ -3,7 +3,7 @@
 
 #include <iostream>
 
-#define N 1024 * 10
+#define N  1024 * 10
 #define WARP_SIZE 32
 #define WINDOW 3
 
