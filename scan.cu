@@ -1,6 +1,6 @@
 #include <iostream>
 
-#define N 1024
+#define N 1024 * 10
 #define WARP_SIZE 32
 #define WINDOW 3
 
@@ -43,7 +43,7 @@ __device__ void scan(float *base_ptr, int warp_i) {
 
 __global__ void vector_add(float *a, partition_state *state) {
     // Setup indexes
-    int partition_index = threadIdx.x / WARP_SIZE;
+    int partition_index = (blockIdx.x * 1024) + threadIdx.x / WARP_SIZE;
     int warp_i = threadIdx.x % 32;
     bool partition_head = warp_i == 0;
 
@@ -113,25 +113,22 @@ int main(){
         // all other values are not read on startup
         state[i] = {.flag = FLAG_BLOCK};
 
-    // for (int i = 0; i < N; i++) {
-    //     std::cout << "" << a[i] << ",";
-    // }
-    // Main function
-    std::cout << "Start kernel"<< std::endl;
-    vector_add<<<1,N>>>(a,state);
-    error = cudaDeviceSynchronize();
-    std::cout << cudaGetErrorString(error);
+    int blocks = N / 1024; 
+    std::cout << "Start kernel with " << blocks << " blocks "<< std::endl;
+    vector_add<<<blocks, 1024>>>(a,state);
 
-    for (int i = 0; i < 100; i++) {
+    error = cudaDeviceSynchronize();
+    
+    if (error)
+        std::cout << "Invocation falied with " << cudaGetErrorString(error) << std::endl;
+
+    for (int i = N - 100 ; i < N; i++) {
         std::cout << "" << a[i] << ",";
     }
     std::cout << std::endl;
     for (int i = 0; i < 10; i++) {
         std::cout << "Sturct Number " << i << " Got Flag " << state[i].flag << " and output " << state[i].inclusive_prefix << std::endl;
     }
-    // for (int i = num_partition - 10; i < num_partition; i++) {
-    //     std::cout << "Sturct Number " << i << " Got Flag " << state[i].flag << " and output " << state[i].aggregate << std::endl;
-    // }
 
     cudaFree(a);
     cudaFree(state);
