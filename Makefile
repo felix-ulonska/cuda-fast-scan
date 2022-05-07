@@ -5,7 +5,7 @@ CUDAPATH = /usr/local/cuda
 
 BUILD_DIR = build
 
-main.out: src/main.cuh src/main.cu src/device.cu src/device.cuh
+main.out: src/*
 	$(NVCC) src/*.cu -o main.out
 
 clean:

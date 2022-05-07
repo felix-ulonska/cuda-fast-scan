@@ -1,7 +1,10 @@
 #include "main.cuh"
 #include "device.cuh"
+#include "host.cuh"
 
 int main(){
+    std::cout << "Starting..." << std::endl;
+
     float *a;
     partition_state *state;
 
@@ -9,33 +12,17 @@ int main(){
 
     // Allocate memory
     auto error = cudaMallocManaged(&state, sizeof(partition_state) * num_partition);
-    cudaMallocManaged(&a, sizeof(float) * N );
-
-    // Initialize array
-    for(int i = 0; i < N; i++){
-        a[i] = i; 
-    }
-
-    for(int i = 0; i < num_partition; i++) 
-        // all other values are not read on startup
-        state[i] = {.flag = FLAG_BLOCK};
-
-    int blocks = N / 1024; 
-    std::cout << "Start kernel with " << blocks << " blocks "<< std::endl;
-    scan_lookback<<<blocks, 1024>>>(a,state);
-
-    error = cudaDeviceSynchronize();
+    if (error) 
+        std::cerr << "Failed allocate States" << std::endl;
+    error = cudaMallocManaged(&a, sizeof(float) * N );
+        std::cerr << "Failed allocate Input" << std::endl;
     
-    if (error)
-        std::cout << "Invocation falied with " << cudaGetErrorString(error) << std::endl;
+    fillArray(a, N);
+    fillStateArr(state, num_partition);
+    
+    runKernel(a, state, N);
 
-    for (int i = N - 100 ; i < N; i++) {
-        std::cout << "" << a[i] << ",";
-    }
-    std::cout << std::endl;
-    for (int i = 0; i < 10; i++) {
-        std::cout << "Sturct Number " << i << " Got Flag " << state[i].flag << " and output " << state[i].inclusive_prefix << std::endl;
-    }
+    output(a, state, N);
 
     cudaFree(a);
     cudaFree(state);
