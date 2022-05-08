@@ -9,4 +9,5 @@ void output(float *arr, partition_state *states, int n);
 float hostBinOp(float a, float b);
 void scanHost(float* dest, float* src, int n);
 bool verifyResult(float* result, float* input, int n);
+bool arr_equal(float* a, float* b, int n);
 #endif

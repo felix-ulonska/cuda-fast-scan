@@ -6,6 +6,7 @@ int main(){
     std::cout << "Starting..." << std::endl;
 
     float *a;
+    float *correct = (float *) malloc(sizeof(float) * N);
     float *copy_input = (float *) malloc(sizeof(float) * N);
     partition_state *state;
 
@@ -18,21 +19,24 @@ int main(){
     error = cudaMallocManaged(&a, sizeof(float) * N );
     if (error) 
         std::cerr << "Failed allocate Input" << std::endl;
+
+    fillArray(a, N);
+    memcpy(copy_input, a, N * sizeof(float));
+    scanHost(correct, copy_input, N);
     
     while (1) {
-        fillArray(a, N);
-        memcpy(copy_input, a, N * sizeof(float));
+        memcpy(a, copy_input, N * sizeof(float));
         fillStateArr(state, num_partition);
-
         
         cudaError_t c_error = runKernel(a, state, N);
+        std::cout << "Done running" << std::endl;
         if (c_error) {
             cudaFree(a);
             cudaFree(state);
             exit(EXIT_FAILURE);
         }
 
-        bool valid = verifyResult(a, copy_input, N);
+        bool valid = arr_equal(a, correct, N);
         if (valid) {
             std::cout << "Result is correct" << std::endl;
             // exit(EXIT_SUCCESS);
@@ -40,12 +44,11 @@ int main(){
             std::cerr << "Result is not correct!" << std::endl;
             exit(EXIT_FAILURE);
         }
-        std::cout << "----" << std::endl;
-        std::cout << "----" << std::endl;
-        std::cout << "----" << std::endl;
-        std::cout << "----" << std::endl;
-        std::cout << "----" << std::endl;
     }
+
+    free(correct);
+    free(copy_input);
+
     cudaFree(a);
     cudaFree(state);
 
