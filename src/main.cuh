@@ -3,9 +3,9 @@
 
 #include <iostream>
 
-#define N  1024 * 10
+#define N  1024 * 30
 #define WARP_SIZE 32
-#define WINDOW 3
+#define WINDOW 50
 
 #define FLAG_BLOCK 1 << 0
 #define FLAG_AGGREGATE (1 << 1)

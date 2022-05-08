@@ -19,28 +19,35 @@ int main(){
     if (error) 
         std::cerr << "Failed allocate Input" << std::endl;
     
-    fillArray(a, N);
-    memcpy(copy_input, a, N * sizeof(float));
-    fillStateArr(state, num_partition);
+    while (1) {
+        fillArray(a, N);
+        memcpy(copy_input, a, N * sizeof(float));
+        fillStateArr(state, num_partition);
 
-    
-    cudaError_t c_error = runKernel(a, state, N);
-    if (c_error) {
-        cudaFree(a);
-        cudaFree(state);
-        exit(EXIT_FAILURE);
+        
+        cudaError_t c_error = runKernel(a, state, N);
+        if (c_error) {
+            cudaFree(a);
+            cudaFree(state);
+            exit(EXIT_FAILURE);
+        }
+
+        bool valid = verifyResult(a, copy_input, N);
+        if (valid) {
+            std::cout << "Result is correct" << std::endl;
+            // exit(EXIT_SUCCESS);
+        } else {
+            std::cerr << "Result is not correct!" << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        std::cout << "----" << std::endl;
+        std::cout << "----" << std::endl;
+        std::cout << "----" << std::endl;
+        std::cout << "----" << std::endl;
+        std::cout << "----" << std::endl;
     }
-
-    bool valid = verifyResult(a, copy_input, N);
     cudaFree(a);
     cudaFree(state);
 
-    if (valid) {
-        std::cout << "Result is correct" << std::endl;
-        exit(EXIT_SUCCESS);
-    } else {
-        std::cerr << "Result is not correct!" << std::endl;
-        exit(EXIT_FAILURE);
-    }
 
 }

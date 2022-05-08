@@ -32,6 +32,7 @@ let
       ncurses5
       stdenv.cc
       binutils
+      gdb
     ];
     multiPkgs = pkgs: with pkgs; [ zlib ];
     runScript = "bash";
@@ -44,6 +45,10 @@ let
   };
 in pkgs.stdenv.mkDerivation {
    name = "cuda-env-shell";
-   nativeBuildInputs = [ fhs ];
+   nativeBuildInputs = [ 
+
+      pkgs.cudaPackages.nsight_compute
+      pkgs.cudaPackages.nsight_systems
+     fhs ];
    shellHook = "exec cuda-env";
 }

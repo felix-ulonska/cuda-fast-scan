@@ -5,7 +5,7 @@ void fillArray(float* arr, int n) {
     std::cout << "fill array" << std::endl;
     // Initialize array
     for(int i = 0; i < n; i++){
-        arr[i] = i % 1024; 
+        arr[i] = i % 10; 
     }
 }
 

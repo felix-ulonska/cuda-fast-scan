@@ -26,7 +26,7 @@ __device__ void scan(float *base_ptr, int warp_i) {
     base_ptr[warp_i] = temp1;
 }
 
-__global__ void scan_lookback(float *a, partition_state *state) {
+__global__ void scan_lookback(float *a, volatile partition_state *state) {
     // Setup indexes
     int partition_index = ((blockIdx.x * 1024) + threadIdx.x) / WARP_SIZE;
     int warp_i = threadIdx.x % 32;
@@ -40,12 +40,12 @@ __global__ void scan_lookback(float *a, partition_state *state) {
 
     if (partition_head) {
         state[partition_index].aggregate = sum;
-        __threadfence();
+        __threadfence_system();
         state[partition_index].flag = FLAG_AGGREGATE;
         
         if (partition_index == 0) {
             state[partition_index].inclusive_prefix = sum;
-            __threadfence();
+            __threadfence_system();
             state[partition_index].flag = FLAG_INCLUSIVEP_PREFIX;
         } 
     }
@@ -54,12 +54,14 @@ __global__ void scan_lookback(float *a, partition_state *state) {
     float prefix = 0;
     if (!partition_head)
         while (state[partition_index].flag == FLAG_AGGREGATE) {
-            __threadfence();
             prefix = 0;
             for (int i = partition_index - 1; i > -1 && i > partition_index - WINDOW - 1; i--) {
-                if (state[i].flag == FLAG_BLOCK)
+                int flag = state[i].flag;
+                __threadfence_system();
+                if (flag == FLAG_BLOCK)
                     break;
-                else if (state[i].flag & FLAG_AGGREGATE) {
+                else if (flag & FLAG_AGGREGATE) {
+                    __threadfence_system();
                     prefix += state[i].aggregate;
                 }
                 else {
@@ -67,9 +69,13 @@ __global__ void scan_lookback(float *a, partition_state *state) {
                     
                     // Compute and record the partition-wide inclusive prefixes.
 
+                    if (prefix == 0) {
+                        printf("p: %d, i: %d, prefix: %f\n", partition_index, i, state[i].inclusive_prefix);
+                        break;
+                    }
                     state[partition_index].prefix = prefix;
                     state[partition_index].inclusive_prefix = prefix + state[partition_index].aggregate;
-                    __threadfence();
+                    __threadfence_system();
                     state[partition_index].flag = FLAG_INCLUSIVEP_PREFIX;
                     break;
                 }
