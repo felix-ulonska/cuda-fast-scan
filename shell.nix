@@ -7,9 +7,6 @@ let
    }) {};
 in 
 let 
-  pkgs =
-    import (fetchTarball
-      https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz) {};
   fhs = pkgs.buildFHSUserEnv {
     name = "cuda-env";
     targetPkgs = pkgs: with pkgs; [ 
@@ -28,7 +25,12 @@ let
       linuxPackages.nvidia_x11
       libGLU libGL
       xorg.libXi xorg.libXmu freeglut
-      xorg.libXext xorg.libX11 xorg.libXv xorg.libXrandr zlib 
+      xorg.libXext xorg.libX11 xorg.libXv xorg.libxcb xorg.libXrandr zlib 
+      # nsight crash reporter needs this need this
+      libkrb5
+      # nsight need qt
+      # yes this is way too much but I
+
       ncurses5
       stdenv.cc
       binutils
@@ -41,14 +43,20 @@ let
        # export LD_LIBRARY_PATH=${pkgs.linuxPackages.nvidia_x11}/lib
        export EXTRA_LDFLAGS="-L/lib -L${pkgs.linuxPackages.nvidia_x11}/lib"
        export EXTRA_CCFLAGS="-I/usr/include"
+
      '';
   };
-in pkgs.stdenv.mkDerivation {
-   name = "cuda-env-shell";
-   nativeBuildInputs = [ 
+in 
+  pkgs.stdenv.mkDerivation {
+    
+     name = "cuda-env-shell";
+     nativeBuildInputs = with pkgs; [ 
+       qt5.qtbase
+       cudaPackages.nsight_systems
+       fhs ];
+       shellHook = ''
+       # for nsight_compute https://discourse.nixos.org/t/python-qt-qpa-plugin-could-not-find-xcb/8862
+       export QT_QPA_PLATFORM_PLUGIN_PATH="${pkgs.qt5.qtbase.bin}/lib/qt-${pkgs.qt5.qtbase.version}/plugins"
+       exec cuda-env'';
+  }
 
-      pkgs.cudaPackages.nsight_compute
-      pkgs.cudaPackages.nsight_systems
-     fhs ];
-   shellHook = "exec cuda-env";
-}

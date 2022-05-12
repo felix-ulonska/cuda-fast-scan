@@ -2,15 +2,15 @@
 #include "device.cuh"
 
 void fillArray(float* arr, int n) {
-    std::cout << "fill array" << std::endl;
     // Initialize array
     for(int i = 0; i < n; i++){
+        // TODO change to random values
         arr[i] = i % 10; 
     }
 }
 
+// TODO rename initState
 void fillStateArr(partition_state* states, int n) {
-    std::cout << "Setting states Mem" << std::endl;
     memset(states, 0, sizeof(partition_state) * n);
 }
 

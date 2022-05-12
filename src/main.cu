@@ -2,6 +2,8 @@
 #include "device.cuh"
 #include "host.cuh"
 
+#define LOOP_TILL_ERROR false
+
 int main(){
     std::cout << "Starting..." << std::endl;
 
@@ -24,7 +26,7 @@ int main(){
     memcpy(copy_input, a, N * sizeof(float));
     scanHost(correct, copy_input, N);
     
-    while (1) {
+    do {
         memcpy(a, copy_input, N * sizeof(float));
         fillStateArr(state, num_partition);
         
@@ -44,7 +46,7 @@ int main(){
             std::cerr << "Result is not correct!" << std::endl;
             exit(EXIT_FAILURE);
         }
-    }
+    } while (LOOP_TILL_ERROR);
 
     free(correct);
     free(copy_input);
