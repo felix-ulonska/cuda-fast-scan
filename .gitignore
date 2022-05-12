@@ -1,4 +1,6 @@
 *.out
 *.sqlite
 *.nsys-rep
+bin
+build
 
