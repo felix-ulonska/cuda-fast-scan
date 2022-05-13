@@ -11,6 +11,8 @@ BIN_DIR = bin
 
 .phony = clean runBaseline
 
+.DEFAULT_GOAL := $(BIN_DIR)/baseline 
+
 $(BUILD_DIR_BASELINE)/%.o: baseline/%.cu* 
 	mkdir -p $(BUILD_DIR_BASELINE)
 	$(NVCC) -c $< -o $@ $(CUDA_OPTIONS)
