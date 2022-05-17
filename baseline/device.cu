@@ -4,11 +4,11 @@
 #define WINDOW 3
 
 __device__ void debug_print(int i) {
-  return;
+  // return;
 
-  if (threadIdx.x == 0) {
-    printf("%d: %d\n", i, blockIdx.x);
-  }
+   if (threadIdx.x == 0) {
+     printf("%d: %d\n", i, blockIdx.x);
+   }
 }
 
 /// Output will be written to base_ptr[0]
@@ -123,9 +123,11 @@ __global__ void scan_lookback(float *a, PartitionDescriptor *states) {
 
   copy_one_item_per_thread(reduction_inplace, global_base_ptr);
   copy_one_item_per_thread(shared_input, global_base_ptr);
+  debug_print(0);
 
   __syncthreads();
   compute_partition_wide_aggregate(reduction_inplace);
+  debug_print(1);
   __syncthreads();
   float aggregate = s[0];
 
@@ -137,12 +139,27 @@ __global__ void scan_lookback(float *a, PartitionDescriptor *states) {
     record_partition_wide_inclusive_prefix(own_partition_descriptor, aggregate,
                                            s[1]);
   }
+  debug_print(2);
+  if (shared_input[threadIdx.x] != 1) {
+    printf("BAAAAAAAAAAAAAAD");
+  }
   __syncthreads();
+  
   float exclusive_prefix = s[1];
+
+  if (exclusive_prefix != blockIdx.x * 128) {
+    printf("BAD exc");
+  }
+
   partition_wide_scan(shared_input);
   __syncthreads();
+  if (abs(shared_input[threadIdx.x] - (float) (threadIdx.x + 1)) > 0.3) {
+    printf("BAD output %f %f\n", shared_input[threadIdx.x], (float) (threadIdx.x + 1));
+  }
+  debug_print(3);
   // Because every thread copies the value it wrote, there is no need to
   // syncthreads
   partition_wide_bin_op(shared_input, exclusive_prefix);
+  __syncthreads();
   copy_one_item_per_thread(global_base_ptr, shared_input);
 }

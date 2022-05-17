@@ -1,8 +1,5 @@
 NVCC = nvcc
 CUDA_OPTIONS = --relocatable-device-code=true
-CC = clang
-
-CUDAPATH = /usr/local/cuda
 
 BUILD_DIR = build
 BUILD_DIR_BASELINE = $(BUILD_DIR)/baseline
@@ -29,14 +26,15 @@ runBaseline: ${BIN_DIR}/baseline
 	./$^
 
 runCheck: ${BIN_DIR}/baseline
-	@echo "Running memcheck"
-	cuda-memcheck ${BIN_DIR}/baseline
-	@echo "Running racecheck"
-	cuda-memcheck ${BIN_DIR}/baseline --tool racecheck
-	@echo "Running synccheck"
-	cuda-memcheck ${BIN_DIR}/baseline --tool synccheck
-	@echo "Running initcheck"
-	cuda-memcheck ${BIN_DIR}/baseline --tool initcheck
+	@echo "[+] Running memcheck"
+	compute-sanitizer ${BIN_DIR}/baseline | grep 'ERROR SUMMARY: 0 errors'
+	@echo "[+] Running racecheck"
+	compute-sanitizer ${BIN_DIR}/baseline --tool racecheck | grep 'ERROR SUMMARY: 0 errors'
+	@echo "[+] Running synccheck"
+	compute-sanitizer ${BIN_DIR}/baseline --tool synccheck | grep 'ERROR SUMMARY: 0 errors'
+	@echo "[+] Running initcheck"
+	compute-sanitizer ${BIN_DIR}/baseline --tool initcheck | grep 'ERROR SUMMARY: 0 errors'
+	@echo "[!] Check for Makefile error code!"
 
 format:
 	find -iname *.cuh -o -iname *.cu | xargs clang-format -i -style=Google

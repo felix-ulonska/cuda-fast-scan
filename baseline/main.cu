@@ -36,7 +36,7 @@ Result exec(int block_size, int amount_blocks) {
   float *gold = (float *)malloc(size_of_input);
   scan_host(gold, input, amount_elems);
 
-  std::cout << "[+] Starting kernel..." << std::endl;
+  // std::cout << "[+] Starting kernel..." << std::endl;
 
   cudaEvent_t start, stop;
 
@@ -68,18 +68,28 @@ Result exec(int block_size, int amount_blocks) {
   float milliseconds = 0;
   cudaEventElapsedTime(&milliseconds, start, stop);
 
-  printf("took %f ms\n", milliseconds);
+  // printf("took %f ms\n", milliseconds);
 
   if (arr_equal(gold, input, amount_elems)) {
-    std::cout << "[+] result is correct" << std::endl;
+    // std::cout << "[+] result is correct" << std::endl;
   } else {
     std::cerr << "[!] Result is not correct" << std::endl;
 
     for (int i = 0; i < amount_blocks; i++) {
+
       printf("State %d got state %d and inclusive_prefix %f and agg %f\n", i,
              partition_descriptiors[i].flag,
              partition_descriptiors[i].inclusive_prefix,
              partition_descriptiors[i].aggregate);
+      if (partition_descriptiors[i].aggregate != 128) {
+        printf("BAD AGG");
+        exit(1);
+      }
+
+      if (partition_descriptiors[i].inclusive_prefix != (i + 1) * 128) {
+        printf("BAD inc");
+        exit(1);
+      }
     }
 
     cudaFree(input);
@@ -99,8 +109,10 @@ int main() {
 
   Result results[iters];
   for (int i = 0; i < iters; i++) {
-    results[i] = exec(24, 1024);
+    results[i] = exec(128, 512);
+    printf("----\n");
   }
+  printf("\n");
 
   float sum = 0;
   for (int i = 0; i < iters; i++) {
