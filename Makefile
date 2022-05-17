@@ -9,7 +9,7 @@ BUILD_DIR_BASELINE = $(BUILD_DIR)/baseline
 BUILD_DIR_SHARED = $(BUILD_DIR)/shared
 BIN_DIR = bin
 
-.phony = clean runBaseline runCheck
+.phony = clean runBaseline runCheck format
 
 .DEFAULT_GOAL := $(BIN_DIR)/baseline 
 
@@ -37,6 +37,9 @@ runCheck: ${BIN_DIR}/baseline
 	cuda-memcheck ${BIN_DIR}/baseline --tool synccheck
 	@echo "Running initcheck"
 	cuda-memcheck ${BIN_DIR}/baseline --tool initcheck
+
+format:
+	find -iname *.cuh -o -iname *.cu | xargs clang-format -i
 
 clean:
 	rm -rf build

@@ -1,8 +1,8 @@
 #ifndef H_MAIN
-#define H_MAIn  _
+#define H_MAIn _
 
 typedef struct {
-	float time;
+  float time;
 } Result;
 
 #endif
