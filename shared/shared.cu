@@ -1,5 +1,6 @@
-#include "shared.cuh"
 #include <iostream>
+
+#include "shared.cuh"
 
 void print_motd() {
 #ifdef VERSION
@@ -19,7 +20,7 @@ void init_array(float *arr, int n) {
 #ifdef RANDOM_INIT
 #else
     // TODO change to random values
-    arr[i] = 1; // i % 10;
+    arr[i] = 1;  // i % 10;
 #endif
   }
 }

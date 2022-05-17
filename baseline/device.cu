@@ -1,5 +1,6 @@
-#include "../shared/shared.cuh"
 #include <stdio.h>
+
+#include "../shared/shared.cuh"
 #define WINDOW 3
 
 __device__ void debug_print(int i) {
@@ -31,8 +32,7 @@ __device__ void copy_one_item_per_thread(float *dest, float *src) {
 __device__ void record_partition_wide_aggregate(PartitionDescriptor *state,
                                                 float reduction_result) {
   // Only let first thread of block do this
-  if (threadIdx.x != 0)
-    return;
+  if (threadIdx.x != 0) return;
 
   state->aggregate = reduction_result;
   __threadfence();
@@ -65,20 +65,17 @@ __device__ void partition_wide_bin_op(float *x, float b) {
 }
 
 // THIS SHOULD ONLY BE CALLED BY ONE THREAD!
-__device__ float
-determine_partitions_exclusive_prefix(PartitionDescriptor *states) {
+__device__ float determine_partitions_exclusive_prefix(
+    PartitionDescriptor *states) {
   // Only let first thread of block do this
-  if (threadIdx.x != 0)
-    return -1;
+  if (threadIdx.x != 0) return -1;
 
   // By definition the first block does needs the neutral element
-  if (blockIdx.x == 0)
-    return NEUTRAL_ELEMENT;
+  if (blockIdx.x == 0) return NEUTRAL_ELEMENT;
 
   int exclusive_prefix = 0;
   int end_index = blockIdx.x - WINDOW;
-  if (end_index < 0)
-    end_index = 0;
+  if (end_index < 0) end_index = 0;
   PartitionDescriptor *end = &states[end_index];
   bool done = false;
   while (!done) {
@@ -105,10 +102,9 @@ determine_partitions_exclusive_prefix(PartitionDescriptor *states) {
   return exclusive_prefix;
 }
 
-__device__ void
-record_partition_wide_inclusive_prefix(PartitionDescriptor *state,
-                                       float partition_wide_aggregate,
-                                       float exclusive_prefix) {
+__device__ void record_partition_wide_inclusive_prefix(
+    PartitionDescriptor *state, float partition_wide_aggregate,
+    float exclusive_prefix) {
   state->inclusive_prefix = partition_wide_aggregate + exclusive_prefix;
   __threadfence();
   state->flag = FLAG_INCLUSIVE_PREFIX;

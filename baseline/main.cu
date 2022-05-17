@@ -1,7 +1,8 @@
+#include <iostream>
+
 #include "../shared/shared.cuh"
 #include "device.cuh"
 #include "main.cuh"
-#include <iostream>
 
 #define VERSION "Baseline"
 

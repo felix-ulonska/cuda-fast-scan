@@ -39,7 +39,7 @@ runCheck: ${BIN_DIR}/baseline
 	cuda-memcheck ${BIN_DIR}/baseline --tool initcheck
 
 format:
-	find -iname *.cuh -o -iname *.cu | xargs clang-format -i
+	find -iname *.cuh -o -iname *.cu | xargs clang-format -i -style=Google
 
 clean:
 	rm -rf build
