@@ -9,7 +9,7 @@ BUILD_DIR_BASELINE = $(BUILD_DIR)/baseline
 BUILD_DIR_SHARED = $(BUILD_DIR)/shared
 BIN_DIR = bin
 
-.phony = clean runBaseline
+.phony = clean runBaseline runCheck
 
 .DEFAULT_GOAL := $(BIN_DIR)/baseline 
 
@@ -27,6 +27,16 @@ $(BIN_DIR)/baseline: $(BUILD_DIR_BASELINE)/main.o $(BUILD_DIR_BASELINE)/device.o
 
 runBaseline: ${BIN_DIR}/baseline
 	./$^
+
+runCheck: ${BIN_DIR}/baseline
+	@echo "Running memcheck"
+	cuda-memcheck ${BIN_DIR}/baseline
+	@echo "Running racecheck"
+	cuda-memcheck ${BIN_DIR}/baseline --tool racecheck
+	@echo "Running synccheck"
+	cuda-memcheck ${BIN_DIR}/baseline --tool synccheck
+	@echo "Running initcheck"
+	cuda-memcheck ${BIN_DIR}/baseline --tool initcheck
 
 clean:
 	rm -rf build

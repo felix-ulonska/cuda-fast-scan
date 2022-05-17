@@ -53,7 +53,7 @@ void scan_host(float* dest, float* src, int n) {
 bool arr_equal(float* a, float* b, int n) {
     for (int i = 0; i < n; i++) {
         // Floats are funny
-        if (floor(a[i]) != floor(b[i])) {
+        if (abs(a[i] - b[i]) > 2) {
            std::cout << "I: " << i << " First val: " << a[i] << " Second Val" << b[i] << std::endl;
            return false;
         }
