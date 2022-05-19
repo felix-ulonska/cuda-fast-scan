@@ -17,21 +17,21 @@
 typedef struct {
   // Allowed values are FLAG_BLOCK, FLAG_INCLUSIVE_PREFIX, FLAG_AGGREGATE
   int flag;
-  float aggregate;
-  float inclusive_prefix;
+  int aggregate;
+  int inclusive_prefix;
 } PartitionDescriptor;
 
 void print_motd();
 
-__device__ __host__ float bin_op(float a, float b);
+__device__ __host__ int bin_op(int a, int b);
 
-void init_array(float *arr, int n);
+void init_array(int *arr, int n);
 void init_state_arr(PartitionDescriptor *states, int n);
 
-void scan_host(float *dest, float *src, int n);
-bool verify_result(float *result, float *input, int n);
-bool arr_equal(float *a, float *b, int n);
+void scan_host(int *dest, int *src, int n);
+bool verify_result(int *result, int *input, int n);
+bool arr_equal(int *a, int *b, int n);
 
-void output_arr(float *a, int n);
+void output_arr(int *a, int n);
 
 #endif

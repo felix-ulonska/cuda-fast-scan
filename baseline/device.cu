@@ -4,15 +4,28 @@
 #define WINDOW 3
 
 __device__ void debug_print(int i) {
-  // return;
+   return;
 
    if (threadIdx.x == 0) {
      printf("%d: %d\n", i, blockIdx.x);
    }
 }
 
+__device__ int thread_reduce(int* partition, size_t size) {
+  int sum = partition[0];
+  for (int i = 1; i < size; i++) {
+    sum = bin_op(sum, partition[i]); 
+  }
+  return sum;
+}
+
 /// Output will be written to base_ptr[0]
-__device__ void compute_partition_wide_aggregate(float *base_ptr) {
+__device__ void block_wide_tree_reduce(__shared__ int *base_ptr) {
+  
+  copy_one_item_per_thread(base_ptr, globalMem);
+  size_t step = 1;
+  base_ptr[threadIdx.x] = thread_reduce(&base_ptr[threadIdx.x + step], step);
+
   for (int d = 1; d <= blockDim.x; d *= 2) {
     if (threadIdx.x % (d * 2) == 0) {
       base_ptr[threadIdx.x] =
@@ -25,12 +38,12 @@ __device__ void compute_partition_wide_aggregate(float *base_ptr) {
 /**
  * Each trehad copies one item into the shared memory
  */
-__device__ void copy_one_item_per_thread(float *dest, float *src) {
+__device__ void copy_one_item_per_thread(int *dest, int *src) {
   dest[threadIdx.x] = src[threadIdx.x];
 }
 
 __device__ void record_partition_wide_aggregate(PartitionDescriptor *state,
-                                                float reduction_result) {
+                                                int reduction_result) {
   // Only let first thread of block do this
   if (threadIdx.x != 0) return;
 
@@ -50,22 +63,36 @@ __device__ void record_partition_wide_aggregate(PartitionDescriptor *state,
  * https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda*
  * A Sum Scan Algorithm That Is Not Work-Efficient
  */
-__device__ void partition_wide_scan(float *x) {
-  int k = threadIdx.x;
-  for (int d = 1; d < blockDim.x; d *= 2) {
-    if (k >= d) {
-      x[k] = bin_op(x[k - d], x[k]);
-    }
-    __syncthreads();
+__device__ void partition_wide_scan(int *x) {
+  // int k = threadIdx.x;
+  // for (int d = 1; d < blockDim.x; d *= 2) {
+  //   __syncthreads();
+  //   if (k >= d) {
+  //     x[k] = bin_op(x[k - d], x[k]);
+  //   }
+  // }
+  if (threadIdx.x == 0) {
+    int *currDest = x;
+    int *currSrc = x;
+
+    // Setting first value
+    *currDest = *currSrc;
+
+    // Moving the pointers through the array and using the last value to calc the
+    // next value
+    do {
+      int nextVal = bin_op(*(++currSrc), *currDest);
+      *(++currDest) = nextVal;
+    } while (currDest != &x[blockDim.x - 1]);
   }
 }
 
-__device__ void partition_wide_bin_op(float *x, float b) {
+__device__ void partition_wide_bin_op(int *x, int b) {
   x[threadIdx.x] = bin_op(x[threadIdx.x], b);
 }
 
 // THIS SHOULD ONLY BE CALLED BY ONE THREAD!
-__device__ float determine_partitions_exclusive_prefix(
+__device__ int determine_partitions_exclusive_prefix(
     PartitionDescriptor *states) {
   // Only let first thread of block do this
   if (threadIdx.x != 0) return -1;
@@ -103,8 +130,8 @@ __device__ float determine_partitions_exclusive_prefix(
 }
 
 __device__ void record_partition_wide_inclusive_prefix(
-    PartitionDescriptor *state, float partition_wide_aggregate,
-    float exclusive_prefix) {
+    PartitionDescriptor *state, int partition_wide_aggregate,
+    int exclusive_prefix) {
   state->inclusive_prefix = partition_wide_aggregate + exclusive_prefix;
   __threadfence();
   state->flag = FLAG_INCLUSIVE_PREFIX;
@@ -112,13 +139,14 @@ __device__ void record_partition_wide_inclusive_prefix(
 
 // Shared memory is two parts, first for inplace reduction, second for input
 // values for inplace scan
-__global__ void scan_lookback(float *a, PartitionDescriptor *states) {
+__global__ void scan_lookback(int *a, PartitionDescriptor *states) {
   // This will be the size of a partition
-  extern __shared__ float s[];
-  float *reduction_inplace = s;
-  float *shared_input = &s[blockDim.x + 1];
+  extern __shared__ int s[];
+  int *reduction_inplace = s;
+  // TODO fix off-by-one
+  int *shared_input = &s[blockDim.x + 1];
 
-  float *global_base_ptr = &a[blockIdx.x * blockDim.x];
+  int *global_base_ptr = &a[blockIdx.x * blockDim.x];
   PartitionDescriptor *own_partition_descriptor = &states[blockIdx.x];
 
   copy_one_item_per_thread(reduction_inplace, global_base_ptr);
@@ -126,10 +154,10 @@ __global__ void scan_lookback(float *a, PartitionDescriptor *states) {
   debug_print(0);
 
   __syncthreads();
-  compute_partition_wide_aggregate(reduction_inplace);
+  block_wide_tree_reduce(reduction_inplace);
   debug_print(1);
   __syncthreads();
-  float aggregate = s[0];
+  int aggregate = s[0];
 
   // We are using shared[1] for propagating the exclusive_prefix inside the
   // block
@@ -145,7 +173,7 @@ __global__ void scan_lookback(float *a, PartitionDescriptor *states) {
   }
   __syncthreads();
   
-  float exclusive_prefix = s[1];
+  int exclusive_prefix = s[1];
 
   if (exclusive_prefix != blockIdx.x * 128) {
     printf("BAD exc");
@@ -153,8 +181,8 @@ __global__ void scan_lookback(float *a, PartitionDescriptor *states) {
 
   partition_wide_scan(shared_input);
   __syncthreads();
-  if (abs(shared_input[threadIdx.x] - (float) (threadIdx.x + 1)) > 0.3) {
-    printf("BAD output %f %f\n", shared_input[threadIdx.x], (float) (threadIdx.x + 1));
+  if (shared_input[threadIdx.x] != (threadIdx.x + 1)) {
+    printf("BAD output %d %d, blockId: %d\n", shared_input[threadIdx.x], (threadIdx.x + 1), blockIdx.x);
   }
   debug_print(3);
   // Because every thread copies the value it wrote, there is no need to

@@ -8,11 +8,11 @@
 
 Result exec(int block_size, int amount_blocks) {
   int amount_elems = block_size * amount_blocks;
-  int size_of_input = sizeof(float) * amount_elems;
+  int size_of_input = sizeof(int) * amount_elems;
   int size_of_partition_descriptiors =
       sizeof(PartitionDescriptor) * amount_blocks;
 
-  float *input;
+  int *input;
   PartitionDescriptor *partition_descriptiors;
 
   if (cudaError error = cudaMallocManaged(&input, size_of_input)) {
@@ -33,7 +33,7 @@ Result exec(int block_size, int amount_blocks) {
   init_state_arr(partition_descriptiors, amount_blocks);
 
   // I will assume that malloc will not fail.
-  float *gold = (float *)malloc(size_of_input);
+  int *gold = (int *)malloc(size_of_input);
   scan_host(gold, input, amount_elems);
 
   // std::cout << "[+] Starting kernel..." << std::endl;
@@ -44,7 +44,7 @@ Result exec(int block_size, int amount_blocks) {
   cudaEventCreate(&stop);
 
   cudaEventRecord(start);
-  scan_lookback<<<amount_blocks, block_size, block_size * sizeof(float) * 2>>>(
+  scan_lookback<<<amount_blocks, block_size,  sizeof(int) * (block_size * 2 + 1)>>>(
       input, partition_descriptiors);
   cudaEventRecord(stop);
 
@@ -77,7 +77,7 @@ Result exec(int block_size, int amount_blocks) {
 
     for (int i = 0; i < amount_blocks; i++) {
 
-      printf("State %d got state %d and inclusive_prefix %f and agg %f\n", i,
+      printf("State %d got state %d and inclusive_prefix %d and agg %d\n", i,
              partition_descriptiors[i].flag,
              partition_descriptiors[i].inclusive_prefix,
              partition_descriptiors[i].aggregate);
@@ -97,7 +97,6 @@ Result exec(int block_size, int amount_blocks) {
     free(gold);
     exit(EXIT_FAILURE);
   }
-
   cudaFree(input);
   cudaFree(partition_descriptiors);
   free(gold);
@@ -105,7 +104,7 @@ Result exec(int block_size, int amount_blocks) {
 }
 
 int main() {
-  int iters = 200000;
+  int iters = 1;
 
   Result results[iters];
   for (int i = 0; i < iters; i++) {
@@ -114,13 +113,13 @@ int main() {
   }
   printf("\n");
 
-  float sum = 0;
+  int sum = 0;
   for (int i = 0; i < iters; i++) {
-    float time = results[i].time;
+    int time = results[i].time;
     sum += time;
 
     // printf("time: %f\n", time);
   }
 
-  printf("Avg: %f", sum / iters);
+  printf("Avg: %d", sum / iters);
 }

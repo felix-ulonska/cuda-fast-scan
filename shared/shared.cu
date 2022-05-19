@@ -13,9 +13,9 @@ void print_motd() {
 /**
         The binary operation, this is shared between all versions
 */
-__device__ __host__ float bin_op(float a, float b) { return a + b; }
+__device__ __host__ int bin_op(int a, int b) { return a + b; }
 
-void init_array(float *arr, int n) {
+void init_array(int *arr, int n) {
   for (int i = 0; i < n; i++) {
 #ifdef RANDOM_INIT
 #else
@@ -34,9 +34,9 @@ void init_state_arr(PartitionDescriptor *state, int n) {
         # Functions to verify Result #
         ------------------------------
 */
-void scan_host(float *dest, float *src, int n) {
-  float *currDest = dest;
-  float *currSrc = src;
+void scan_host(int *dest, int *src, int n) {
+  int *currDest = dest;
+  int *currSrc = src;
 
   // Setting first value
   *currDest = *currSrc;
@@ -44,12 +44,12 @@ void scan_host(float *dest, float *src, int n) {
   // Moving the pointers through the array and using the last value to calc the
   // next value
   do {
-    float nextVal = bin_op(*(++currSrc), *currDest);
+    int nextVal = bin_op(*(++currSrc), *currDest);
     *(++currDest) = nextVal;
   } while (currDest != &dest[n]);
 }
 
-bool arr_equal(float *a, float *b, int n) {
+bool arr_equal(int *a, int *b, int n) {
   for (int i = 0; i < n; i++) {
     // Floats are funny
     if (abs(a[i] - b[i]) > 0.3) {
@@ -61,14 +61,14 @@ bool arr_equal(float *a, float *b, int n) {
   return true;
 }
 
-void output_arr(float *a, int n) {
+void output_arr(int *a, int n) {
   for (int i = 0; i < n; i++) {
-    printf("[?] i: %d: %f\n", i, a[i]);
+    printf("[?] i: %d: %d\n", i, a[i]);
   }
 }
 
-bool verifyResult(float *result, float *input, int n) {
-  float *output_arr = (float *)malloc(sizeof(float) * n);
+bool verifyResult(int *result, int *input, int n) {
+  int *output_arr = (int *)malloc(sizeof(int) * n);
   scan_host(output_arr, input, n);
 
   bool is_equal = arr_equal(result, output_arr, n);
