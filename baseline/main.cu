@@ -6,35 +6,29 @@
 
 #define VERSION "Baseline"
 
-Result exec(int block_size, int amount_blocks) {
-  int amount_elems = block_size * amount_blocks;
-  int size_of_input = sizeof(int) * amount_elems;
-  int size_of_partition_descriptiors =
-      sizeof(PartitionDescriptor) * amount_blocks;
-
+Result exec() {
   int *input;
   PartitionDescriptor *partition_descriptiors;
 
-  if (cudaError error = cudaMallocManaged(&input, size_of_input)) {
+  if (cudaError error = cudaMallocManaged(&input, SIZE_OF_INPUT)) {
     std::cerr << "[!] Cuda Malloc Managed for input failed with error"
               << cudaGetErrorName(error) << std::endl;
     exit(EXIT_FAILURE);
   }
 
-  if (cudaError error = cudaMallocManaged(&partition_descriptiors,
-                                          size_of_partition_descriptiors)) {
+  if (cudaError error = cudaMallocManaged(&partition_descriptiors, SIZE_OF_PARTITION_DESCRIPTIORS)) {
     std::cerr << "[!] Cuda Malloc Managed for state failed with error"
               << cudaGetErrorName(error) << std::endl;
     cudaFree(input);
     exit(EXIT_FAILURE);
   }
 
-  init_array(input, amount_elems);
-  init_state_arr(partition_descriptiors, amount_blocks);
+  init_array(input, AMOUNT_ELEMS);
+  init_state_arr(partition_descriptiors, AMOUNT_BLOCKS);
 
   // I will assume that malloc will not fail.
-  int *gold = (int *)malloc(size_of_input);
-  scan_host(gold, input, amount_elems);
+  int *gold = (int *)malloc(SIZE_OF_INPUT);
+  scan_host(gold, input, AMOUNT_ELEMS);
 
   // std::cout << "[+] Starting kernel..." << std::endl;
 
@@ -44,8 +38,9 @@ Result exec(int block_size, int amount_blocks) {
   cudaEventCreate(&stop);
 
   cudaEventRecord(start);
-  scan_lookback<<<amount_blocks, block_size,  sizeof(int) * (block_size * 2 + 1)>>>(
-      input, partition_descriptiors);
+  scan_kernel<<<AMOUNT_BLOCKS, THREADS_PER_BLOCK,
+                  sizeof(int) * (THREADS_PER_BLOCK + ITEMS_PER_BLOCK)>>>(input,
+                                                        partition_descriptiors);
   cudaEventRecord(stop);
 
   if (cudaError error = cudaDeviceSynchronize()) {
@@ -70,26 +65,16 @@ Result exec(int block_size, int amount_blocks) {
 
   // printf("took %f ms\n", milliseconds);
 
-  if (arr_equal(gold, input, amount_elems)) {
+  if (arr_equal(gold, input, AMOUNT_ELEMS)) {
     // std::cout << "[+] result is correct" << std::endl;
   } else {
     std::cerr << "[!] Result is not correct" << std::endl;
 
-    for (int i = 0; i < amount_blocks; i++) {
-
+    for (int i = 0; i < AMOUNT_BLOCKS; i++) {
       printf("State %d got state %d and inclusive_prefix %d and agg %d\n", i,
              partition_descriptiors[i].flag,
              partition_descriptiors[i].inclusive_prefix,
              partition_descriptiors[i].aggregate);
-      if (partition_descriptiors[i].aggregate != 128) {
-        printf("BAD AGG");
-        exit(1);
-      }
-
-      if (partition_descriptiors[i].inclusive_prefix != (i + 1) * 128) {
-        printf("BAD inc");
-        exit(1);
-      }
     }
 
     cudaFree(input);
@@ -108,8 +93,8 @@ int main() {
 
   Result results[iters];
   for (int i = 0; i < iters; i++) {
-    results[i] = exec(128, 512);
-    printf("----\n");
+    results[i] = exec();
+    printf(".");
   }
   printf("\n");
 

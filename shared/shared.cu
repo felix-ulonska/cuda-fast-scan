@@ -51,7 +51,6 @@ void scan_host(int *dest, int *src, int n) {
 
 bool arr_equal(int *a, int *b, int n) {
   for (int i = 0; i < n; i++) {
-    // Floats are funny
     if (abs(a[i] - b[i]) > 0.3) {
       std::cout << "I: " << i << " First val: " << a[i] << " Second Val" << b[i]
                 << std::endl;
