@@ -4,18 +4,18 @@
 #include "thread.cuh"
 #include "block.cuh"
 
-__global__ void scan_kernel(int *a, PartitionDescriptor *states) {
+__global__ void scan_kernel(int *g_input, PartitionDescriptor *states) {
 
   extern __shared__ int s[];
 
   // Parfor block
   {
-    int* b_ptr_input = &a[ITEMS_PER_BLOCK * blockIdx.x];
+    int* b_ptr_input = &g_input[ITEMS_PER_BLOCK * blockIdx.x];
     int* b_ptr_shared_reduction = &s[0];
     int* b_ptr_shared_input_copy = &s[blockDim.x];
     PartitionDescriptor* partDesc = &states[blockIdx.x];
 
-    // Parfor thread copy into shared memory
+    // Parfor thread in block
     {
       int* t_ptr_input = &b_ptr_input[threadIdx.x * ITEMS_PER_THREAD];
       int* t_ptr_shared_reduction = &b_ptr_shared_reduction[threadIdx.x];
@@ -25,7 +25,7 @@ __global__ void scan_kernel(int *a, PartitionDescriptor *states) {
     }
     __syncthreads();
 
-    // PARFOR for reduction
+    // Parfor thread in block
     {
       int* t_ptr_input = &b_ptr_input[threadIdx.x * ITEMS_PER_THREAD];
       int* t_ptr_shared_reduction = &b_ptr_shared_reduction[threadIdx.x];
@@ -47,7 +47,6 @@ __global__ void scan_kernel(int *a, PartitionDescriptor *states) {
     if (threadIdx.x == 0 && blockIdx.x != 0) {
       b_get_exclusive_prefix(states, &b_ptr_shared_reduction[0]);
     }
-
     __syncthreads();
 
     if (!threadIdx.x && blockIdx.x != 0) {
@@ -55,14 +54,14 @@ __global__ void scan_kernel(int *a, PartitionDescriptor *states) {
       __threadfence();
       partDesc->flag = FLAG_INCLUSIVE_PREFIX;
     }
-
     __syncthreads();
 
     if (threadIdx.x == 0) {
       b_scan(b_ptr_shared_input_copy);
     }
+    __syncthreads();
 
-    // Parfor binOp
+    // Parfor thread in block
     {
       int* t_ptr_input = &b_ptr_input[threadIdx.x * ITEMS_PER_THREAD];
       int* t_ptr_shared_reduction = &b_ptr_shared_reduction[threadIdx.x];
@@ -70,5 +69,6 @@ __global__ void scan_kernel(int *a, PartitionDescriptor *states) {
 
       t_bin_op(t_ptr_input, t_ptr_shared_input, b_ptr_shared_reduction[0]);
     }
-  };
+    __syncthreads();
+  }
 }
