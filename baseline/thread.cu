@@ -20,10 +20,21 @@ __device__ int t_tree_reduction(int* a) {
 
 __device__ void t_bin_op(int* dest, int* src, int addValue) {
   for (int i = 0; i < ITEMS_PER_THREAD; i++) {
-    if (blockIdx.x > 0) {
-      dest[i] = bin_op(src[i], addValue);
-    } else {
-      dest[i] = src[i];
-    }
+    dest[i] = bin_op(src[i], addValue);
   }
+}
+
+__device__ void t_scan(int* a, int len) {
+  int *currDest = a;
+  int *currSrc = a;
+
+  // Setting first value
+  *currDest = *currSrc;
+
+  // Moving the pointers through the array and using the last value to calc
+  // the next value
+  do {
+    int nextVal = bin_op(*(++currSrc), *currDest);
+    *(++currDest) = nextVal;
+  } while (currDest != &a[len - 1]);
 }

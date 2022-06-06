@@ -16,5 +16,6 @@ __device__ int t_tree_reduction(int* a);
   * Copies ITEMS_PER_THREAD items from src to dest
   */
 __device__ void t_mem_cpy(int* dest, int* src);
+__device__ void t_scan(int* i, int len);
 
 #endif

@@ -1,14 +1,18 @@
 #include "../shared/shared.cuh"
 #include "main.cuh"
+#include "thread.cuh"
+#include <stdio.h>
 
 __device__ void b_tree_reduction(int* a) {
-    for (int d = 1; d < blockDim.x; d *= 2) {
-      if (threadIdx.x % (d * 2) == 0 && threadIdx.x + d < blockDim.x) {
-        a[threadIdx.x] =
-            bin_op(a[threadIdx.x + d], a[threadIdx.x]);
-      }
-      __syncthreads();
+  for (int d = 1; d < blockDim.x; d *= 2) {
+    // TODO move to thread level
+    // TODO remove second part of if
+    if (threadIdx.x % (d * 2) == 0) {
+      a[threadIdx.x] =
+          bin_op(a[threadIdx.x + d], a[threadIdx.x]);
     }
+    __syncthreads();
+  }
 }
 
 __device__ void b_set_partition_descriptor(PartitionDescriptor* partDesc, int aggregate) {
@@ -55,17 +59,17 @@ __device__ void b_get_exclusive_prefix(PartitionDescriptor* states, int* exclusi
   *exclusive_prefix_location = exclusive_prefix;
 }
 
+// Sklansky scan
 __device__ void b_scan(int* a) {
-  int *currDest = a;
-  int *currSrc = a;
+  t_scan(&a[threadIdx.x * ITEMS_PER_THREAD], ITEMS_PER_THREAD);
+  __syncthreads();
 
-  // Setting first value
-  *currDest = *currSrc;
-
-  // Moving the pointers through the array and using the last value to calc
-  // the next value
-  do {
-    int nextVal = bin_op(*(++currSrc), *currDest);
-    *(++currDest) = nextVal;
-  } while (currDest != &a[ITEMS_PER_BLOCK - 1]);
+  for (int k = 2; k <= blockDim.x; k *= 2) {
+    int add_val_index = ((threadIdx.x / k) * k) + ((k / 2) - 1);
+    // printf("tid: %d, k: %d, add_val %d\n", threadIdx.x, k, add_val);
+    if (threadIdx.x % k >= k / 2) {
+      t_bin_op(&a[threadIdx.x * ITEMS_PER_THREAD], &a[threadIdx.x * ITEMS_PER_THREAD], a[(add_val_index + 1) * ITEMS_PER_THREAD - 1]);
+    }
+    __syncthreads();
+  }
 }
