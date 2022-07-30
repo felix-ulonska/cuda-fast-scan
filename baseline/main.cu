@@ -3,7 +3,9 @@
 #include "../shared/shared.cuh"
 #include "device.cuh"
 #include "main.cuh"
-
+#include "params.cuh"
+#include <iostream>
+#include <fstream>
 #define VERSION "Baseline"
 
 Result exec() {
@@ -89,22 +91,27 @@ Result exec() {
 }
 
 int main() {
-  int iters = 1;
+  int iters = 2;
 
   Result results[iters];
   for (int i = 0; i < iters; i++) {
     results[i] = exec();
-    printf(".");
   }
-  printf("\n");
 
   int sum = 0;
+  FILE *fp;
+  if((fp=fopen(CSV_OUTPUT_PATH, "w"))==NULL) {
+    printf("cannot open.\n");
+    exit(1);
+  }
+
   for (int i = 0; i < iters; i++) {
     int time = results[i].time;
     sum += time;
-
+    std::fprintf(fp, "%d,\n", time);
     // printf("time: %f\n", time);
   }
+  std::fclose(fp);
 
-  printf("Avg: %d", sum / iters);
+  printf("success\n");
 }

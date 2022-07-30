@@ -1,6 +1,7 @@
 #include "main.cuh"
 #include "thread.cuh"
 #include "../shared/shared.cuh"
+#include "params.cuh"
 
 __device__ void t_mem_cpy(int* dest, int* src) {
     // Copy into shared

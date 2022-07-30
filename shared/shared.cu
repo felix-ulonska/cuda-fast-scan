@@ -26,7 +26,14 @@ void init_array(int *arr, int n) {
 }
 
 void init_state_arr(PartitionDescriptor *state, int n) {
-  memset(state, 0, sizeof(PartitionDescriptor) * n);
+  for (int i = 0; i < n; i++) {
+    state[0] = PartitionDescriptor {
+      .flag = FLAG_BLOCK,
+      .aggregate = 0,
+      .inclusive_prefix = 0,
+    };
+  }
+  //memset(state, 0, sizeof(PartitionDescriptor) * n);
 }
 
 /**

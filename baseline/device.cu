@@ -3,8 +3,9 @@
 #include "main.cuh"
 #include "thread.cuh"
 #include "block.cuh"
+#include "params.cuh"
 
-__global__ void scan_kernel(int *g_input, PartitionDescriptor *states) {
+__global__ void scan_kernel(int *g_input, PartitionDescriptor volatile *states) {
 
   extern __shared__ int s[];
 
@@ -13,7 +14,7 @@ __global__ void scan_kernel(int *g_input, PartitionDescriptor *states) {
     int* b_ptr_input = &g_input[ITEMS_PER_BLOCK * blockIdx.x];
     int* b_ptr_shared_reduction = &s[0];
     int* b_ptr_shared_input_copy = &s[blockDim.x];
-    PartitionDescriptor* partDesc = &states[blockIdx.x];
+    volatile PartitionDescriptor* partDesc = &states[blockIdx.x];
 
     for (int i = 0; i < ITEMS_PER_BLOCK; i += blockDim.x) {
       // Thread level

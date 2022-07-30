@@ -2,6 +2,7 @@
 #include "main.cuh"
 #include "thread.cuh"
 #include <stdio.h>
+#include "params.cuh"
 
 __device__ void b_tree_reduction(int* a) {
   for (int d = 1; d < blockDim.x; d *= 2) {
@@ -15,7 +16,7 @@ __device__ void b_tree_reduction(int* a) {
   }
 }
 
-__device__ void b_set_partition_descriptor(PartitionDescriptor* partDesc, int aggregate) {
+__device__ void b_set_partition_descriptor(volatile PartitionDescriptor* partDesc, int aggregate) {
   if (blockIdx.x != 0) {
     partDesc->aggregate = aggregate;       
     __threadfence();
@@ -29,24 +30,28 @@ __device__ void b_set_partition_descriptor(PartitionDescriptor* partDesc, int ag
   }
 }
 
-__device__ void b_get_exclusive_prefix(PartitionDescriptor* states, int* exclusive_prefix_location) {
+__device__ void b_get_exclusive_prefix(volatile PartitionDescriptor* states, int* exclusive_prefix_location) {
   int exclusive_prefix = 0;
   int end_index = blockIdx.x - WINDOW;
   if (end_index < 0) end_index = 0;
-  PartitionDescriptor *end = &states[end_index];
+  volatile PartitionDescriptor *end = &states[end_index];
   bool done = false;
   while (!done) {
     exclusive_prefix = 0;
-    PartitionDescriptor *currState = &states[blockIdx.x];
+    volatile PartitionDescriptor *currState = &states[blockIdx.x];
 
     while (currState != end) {
       currState--;
       int flag = currState->flag;
       __threadfence();
-
+      int agg = currState->aggregate;
+      
       if (flag == FLAG_BLOCK) {
         break;
       } else if (flag == FLAG_AGGREGATE) {
+        if (agg != 1024) {
+          printf("bad agg readed\n"); 
+        }
         exclusive_prefix = bin_op(currState->aggregate, exclusive_prefix);
       } else if (flag == FLAG_INCLUSIVE_PREFIX) {
         exclusive_prefix =

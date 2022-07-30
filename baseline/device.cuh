@@ -2,6 +2,6 @@
 #define H_DEVICE _
 #include "../shared/shared.cuh"
 
-__global__ void scan_kernel(int *a, PartitionDescriptor *states);
+__global__ void scan_kernel(int *a, volatile PartitionDescriptor *states);
 
 #endif
