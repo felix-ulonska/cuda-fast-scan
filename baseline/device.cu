@@ -18,8 +18,12 @@ __global__ void scan_kernel(int *g_input, PartitionDescriptor volatile *states) 
 
     for (int i = 0; i < ITEMS_PER_BLOCK; i += blockDim.x) {
       // Thread level
+      if (b_ptr_input[i + threadIdx.x] != 1) {
+        printf("BAD INPUT");
+      };
       b_ptr_shared_input_copy[i + threadIdx.x] = b_ptr_input[i + threadIdx.x];
     }
+    __syncthreads();
 
 
     // Parfor thread in block

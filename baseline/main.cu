@@ -91,7 +91,7 @@ Result exec() {
 }
 
 int main() {
-  int iters = 2;
+  int iters = 100;
 
   Result results[iters];
   for (int i = 0; i < iters; i++) {
