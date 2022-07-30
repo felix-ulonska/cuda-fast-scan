@@ -66,10 +66,15 @@ __global__ void scan_kernel(int *g_input, PartitionDescriptor volatile *states) 
     // Parfor thread
     {
       if (blockIdx.x == 0) {
-        t_mem_cpy(t_ptr_input, t_ptr_shared_input);
+        for (int i = 0; i < ITEMS_PER_THREAD; i++) {
+          t_ptr_input[i] = bin_op(t_ptr_input[i], t_ptr_shared_input[i]);
+        }
       } else {
         // TODO fix global colleasing
-        t_bin_op(t_ptr_input, t_ptr_shared_input, b_ptr_shared_reduction[0]);
+        for (int i = 0; i < ITEMS_PER_THREAD; i++) {
+          t_ptr_input[i] = bin_op(t_ptr_input[i], t_ptr_shared_input[i]);
+        }
+        t_bin_op(t_ptr_input, t_ptr_input, b_ptr_shared_reduction[0]);
       }
     }
   }

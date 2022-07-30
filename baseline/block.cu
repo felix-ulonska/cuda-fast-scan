@@ -4,13 +4,25 @@
 #include <stdio.h>
 #include "params.cuh"
 
+// __device__ void b_tree_reduction(int* a) {
+//   for (int d = 1; d < blockDim.x; d *= 2) {
+//     // TODO move to thread level
+//     // TODO remove second part of if
+//     if (threadIdx.x % (d * 2) == 0) {
+//       a[threadIdx.x] =
+//           bin_op(a[threadIdx.x + d], a[threadIdx.x]);
+//     }
+//     __syncthreads();
+//   }
+// }
+
 __device__ void b_tree_reduction(int* a) {
-  for (int d = 1; d < blockDim.x; d *= 2) {
-    // TODO move to thread level
-    // TODO remove second part of if
-    if (threadIdx.x % (d * 2) == 0) {
-      a[threadIdx.x] =
-          bin_op(a[threadIdx.x + d], a[threadIdx.x]);
+  for (std::size_t k = (THREADS_PER_BLOCK / 2); k > 0; k = k / 2) {
+  
+    if (threadIdx.x < k) {
+      a[(threadIdx.x - 0)] =
+          a[(threadIdx.x - 0)] +
+          a[((threadIdx.x - 0) + k)];
     }
     __syncthreads();
   }
@@ -49,9 +61,6 @@ __device__ void b_get_exclusive_prefix(volatile PartitionDescriptor* states, int
       if (flag == FLAG_BLOCK) {
         break;
       } else if (flag == FLAG_AGGREGATE) {
-        if (agg != 1024) {
-          printf("bad agg readed\n"); 
-        }
         exclusive_prefix = bin_op(currState->aggregate, exclusive_prefix);
       } else if (flag == FLAG_INCLUSIVE_PREFIX) {
         exclusive_prefix =
@@ -65,15 +74,58 @@ __device__ void b_get_exclusive_prefix(volatile PartitionDescriptor* states, int
 }
 
 // Sklansky scan
+// __device__ void b_scan(int* a) {
+//   t_scan(&a[threadIdx.x * ITEMS_PER_THREAD], ITEMS_PER_THREAD);
+//   __syncthreads();
+// 
+//   for (int k = 2; k <= blockDim.x; k *= 2) {
+//     int add_val_index = ((threadIdx.x / k) * k) + ((k / 2) - 1);
+//     // printf("tid: %d, k: %d, add_val %d\n", threadIdx.x, k, add_val);
+//     if (threadIdx.x % k >= k / 2) {
+//       t_bin_op(&a[threadIdx.x * ITEMS_PER_THREAD], &a[threadIdx.x * ITEMS_PER_THREAD], a[(add_val_index + 1) * ITEMS_PER_THREAD - 1]);
+//     }
+//     __syncthreads();
+//   }
+// }
+
 __device__ void b_scan(int* a) {
-  t_scan(&a[threadIdx.x * ITEMS_PER_THREAD], ITEMS_PER_THREAD);
+  const auto foo = a;
+  for (std::size_t d = THREADS_PER_BLOCK; d > 0; d = d / 2) {
+    if (threadIdx.x < d) {
+      (&(*foo))[(((threadIdx.x - 0) * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
+                 (((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d) - 1))] =
+          (&(*foo))[(
+              ((threadIdx.x - 0) * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
+              (((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d) - 1))] +
+          (&(*foo))[(
+              ((threadIdx.x - 0) * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
+              ((THREADS_PER_BLOCK / d) - 1))];
+    }
+    __syncthreads();
+  }
+  
+  if (threadIdx.x < 1) {
+    foo[((threadIdx.x - 0) + ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) - 1))] = 0;
+  }
   __syncthreads();
 
-  for (int k = 2; k <= blockDim.x; k *= 2) {
-    int add_val_index = ((threadIdx.x / k) * k) + ((k / 2) - 1);
-    // printf("tid: %d, k: %d, add_val %d\n", threadIdx.x, k, add_val);
-    if (threadIdx.x % k >= k / 2) {
-      t_bin_op(&a[threadIdx.x * ITEMS_PER_THREAD], &a[threadIdx.x * ITEMS_PER_THREAD], a[(add_val_index + 1) * ITEMS_PER_THREAD - 1]);
+  for (std::size_t d = 1; d <= THREADS_PER_BLOCK; d = d * 2) {
+
+    if (threadIdx.x < d) {
+      const auto t = (&(
+          *foo))[(((threadIdx.x - 0) * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
+                  ((THREADS_PER_BLOCK / d) - 1))];
+      (&(*foo))[(((threadIdx.x - 0) * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
+                 ((THREADS_PER_BLOCK / d) - 1))] =
+          (&(*foo))[(
+              ((threadIdx.x - 0) * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
+              (((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d) - 1))];
+      (&(*foo))[(((threadIdx.x - 0) * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
+                 (((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d) - 1))] =
+          (&(*foo))[(
+              ((threadIdx.x - 0) * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
+              (((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d) - 1))] +
+          t;
     }
     __syncthreads();
   }

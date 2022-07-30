@@ -41,7 +41,7 @@ Result exec() {
 
   cudaEventRecord(start);
   scan_kernel<<<AMOUNT_BLOCKS, THREADS_PER_BLOCK,
-                  sizeof(int) * (THREADS_PER_BLOCK + ITEMS_PER_BLOCK)>>>(input,
+                  sizeof(int) * (THREADS_PER_BLOCK + ITEMS_PER_BLOCK) * 2>>>(input,
                                                         partition_descriptiors);
   cudaEventRecord(stop);
 
@@ -106,9 +106,9 @@ int main() {
   }
 
   for (int i = 0; i < iters; i++) {
-    int time = results[i].time;
+    float time = results[i].time;
     sum += time;
-    std::fprintf(fp, "%d,\n", time);
+    std::fprintf(fp, "%f,\n", time);
     // printf("time: %f\n", time);
   }
   std::fclose(fp);
