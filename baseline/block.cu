@@ -73,6 +73,47 @@ __device__ void b_get_exclusive_prefix(volatile PartitionDescriptor* states, int
   *exclusive_prefix_location = exclusive_prefix;
 }
 
+__device__ void b_get_exclusive_prefix_new(volatile PartitionDescriptor* states, int* exclusive_prefix_location) {
+  if (blockIdx.x > 0) {
+    *exclusive_prefix_location = 0;
+    int exclusive_prefix = 0;
+    auto not_done = true;
+    while (not_done) {
+      *exclusive_prefix_location = 0;
+      exclusive_prefix = 0;
+      auto i = 1;
+      auto flag = 0;
+      auto agg = 0;
+      auto prefix = 0;
+      auto not_break_loop = true;
+      while (i <= WINDOW && blockIdx.x - i >= 0 &&
+             not_break_loop) {
+        volatile PartitionDescriptor *currState = &states[blockIdx.x - i];
+        // unsafe
+        {
+          flag = currState->flag;
+          __threadfence();
+          agg = currState->aggregate;
+          prefix = currState->inclusive_prefix;
+        }
+        if (flag == FLAG_BLOCK) {
+          not_break_loop = false;
+        }
+        if (flag == FLAG_AGGREGATE) {
+          exclusive_prefix += agg;
+        }
+        if (flag == FLAG_INCLUSIVE_PREFIX) {
+          exclusive_prefix += prefix;
+          not_break_loop = false;
+          not_done = false;
+        }
+        i = i - 1;
+      }
+    }
+    *exclusive_prefix_location = exclusive_prefix;
+  }
+}
+
 // Sklansky scan
 // __device__ void b_scan(int* a) {
 //   t_scan(&a[threadIdx.x * ITEMS_PER_THREAD], ITEMS_PER_THREAD);

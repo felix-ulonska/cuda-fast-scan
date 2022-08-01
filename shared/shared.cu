@@ -57,14 +57,15 @@ void scan_host(int *dest, int *src, int n) {
 }
 
 bool arr_equal(int *a, int *b, int n) {
+  bool bad = false;
   for (int i = 0; i < n; i++) {
     if (abs(a[i] - b[i]) > 0.3) {
       std::cout << "I: " << i << " First val: " << a[i] << " Second Val" << b[i]
                 << std::endl;
-      return false;
+      bad = true;
     }
   }
-  return true;
+  return !bad;
 }
 
 void output_arr(int *a, int n) {
