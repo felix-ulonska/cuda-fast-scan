@@ -13,7 +13,7 @@ void print_motd() {
 /**
         The binary operation, this is shared between all versions
 */
-__device__ __host__ int bin_op(int a, int b) { return a + b; }
+__device__ __forceinline__ __host__ int bin_op(int a, int b) { return a + b; }
 
 void init_array(int *arr, int n) {
   for (int i = 0; i < n; i++) {
@@ -27,7 +27,7 @@ void init_array(int *arr, int n) {
 
 void init_state_arr(PartitionDescriptor *state, int n) {
   for (int i = 0; i < n; i++) {
-    state[0] = PartitionDescriptor {
+    state[i] = PartitionDescriptor {
       .flag = FLAG_BLOCK,
       .aggregate = 0,
       .inclusive_prefix = 0,
@@ -62,6 +62,7 @@ bool arr_equal(int *a, int *b, int n) {
     if (abs(a[i] - b[i]) > 0.3) {
       std::cout << "I: " << i << " First val: " << a[i] << " Second Val" << b[i]
                 << std::endl;
+      return false;
       bad = true;
     }
   }

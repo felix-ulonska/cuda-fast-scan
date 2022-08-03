@@ -8,22 +8,31 @@
 #include <fstream>
 #define VERSION "Baseline"
 
+// I want to know if multiple compile units are the problem
+#include "block.cu"
+#include "device.cu"
+#include "thread.cu"
+#include "../shared/shared.cu"
+
 Result exec() {
-  int *input;
-  PartitionDescriptor *partition_descriptiors;
+  int *input = (int*) malloc(SIZE_OF_INPUT);
+  PartitionDescriptor *partition_descriptiors = (PartitionDescriptor*) malloc(SIZE_OF_PARTITION_DESCRIPTIORS);
 
-  if (cudaError error = cudaMallocManaged(&input, SIZE_OF_INPUT)) {
-    std::cerr << "[!] Cuda Malloc Managed for input failed with error"
-              << cudaGetErrorName(error) << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  int *inputOnGpu;
+  PartitionDescriptor *descOnGpu;
 
-  if (cudaError error = cudaMallocManaged(&partition_descriptiors, SIZE_OF_PARTITION_DESCRIPTIORS)) {
-    std::cerr << "[!] Cuda Malloc Managed for state failed with error"
-              << cudaGetErrorName(error) << std::endl;
-    cudaFree(input);
-    exit(EXIT_FAILURE);
-  }
+  // if (cudaError error = cudaMallocManaged(&input, SIZE_OF_INPUT)) {
+  //   std::cerr << "[!] Cuda Malloc Managed for input failed with error"
+  //             << cudaGetErrorName(error) << std::endl;
+  //   exit(EXIT_FAILURE);
+  // }
+
+  // if (cudaError error = cudaMallocManaged(&partition_descriptiors, SIZE_OF_PARTITION_DESCRIPTIORS)) {
+  //   std::cerr << "[!] Cuda Malloc Managed for state failed with error"
+  //             << cudaGetErrorName(error) << std::endl;
+  //   cudaFree(input);
+  //   exit(EXIT_FAILURE);
+  // }
 
   init_array(input, AMOUNT_ELEMS);
   init_state_arr(partition_descriptiors, AMOUNT_BLOCKS);
@@ -34,6 +43,14 @@ Result exec() {
 
   // std::cout << "[+] Starting kernel..." << std::endl;
 
+  if (cudaMalloc(&inputOnGpu, SIZE_OF_INPUT) |
+  cudaMemcpy(inputOnGpu, input, SIZE_OF_INPUT, cudaMemcpyHostToDevice) |
+  cudaMalloc(&descOnGpu, SIZE_OF_PARTITION_DESCRIPTIORS) | 
+  cudaMemcpy(descOnGpu, partition_descriptiors, SIZE_OF_PARTITION_DESCRIPTIORS, cudaMemcpyHostToDevice)) {
+    printf("BAD err");
+    exit(1);
+  }
+
   cudaEvent_t start, stop;
 
   cudaEventCreate(&start);
@@ -41,8 +58,8 @@ Result exec() {
 
   cudaEventRecord(start);
   scan_kernel<<<AMOUNT_BLOCKS, THREADS_PER_BLOCK,
-                  sizeof(int) * (THREADS_PER_BLOCK + ITEMS_PER_BLOCK) * 2>>>(input,
-                                                        partition_descriptiors);
+                  sizeof(int) * (THREADS_PER_BLOCK + ITEMS_PER_BLOCK) * 2>>>(inputOnGpu,
+                                                        descOnGpu);
   cudaEventRecord(stop);
 
   if (cudaError error = cudaDeviceSynchronize()) {
@@ -52,6 +69,9 @@ Result exec() {
     free(gold);
     exit(EXIT_FAILURE);
   }
+
+  cudaMemcpy(input, inputOnGpu, SIZE_OF_INPUT, cudaMemcpyDeviceToHost);
+  cudaMemcpy(partition_descriptiors, descOnGpu, SIZE_OF_PARTITION_DESCRIPTIORS, cudaMemcpyDeviceToHost);
 
   if (cudaError error = cudaEventSynchronize(stop)) {
     std::cerr << "[!] Event Sync failed" << cudaGetErrorName(error)
@@ -84,8 +104,10 @@ Result exec() {
     free(gold);
     exit(EXIT_FAILURE);
   }
-  cudaFree(input);
-  cudaFree(partition_descriptiors);
+  free(input);
+  free(partition_descriptiors);
+  cudaFree(inputOnGpu);
+  cudaFree(descOnGpu);
   free(gold);
   return Result{.time = milliseconds};
 }
