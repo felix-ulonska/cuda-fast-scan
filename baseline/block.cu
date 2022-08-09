@@ -16,7 +16,7 @@
 //   }
 // }
 
-__device__ void b_tree_reduction(int* a) {
+__device__ __forceinline__ void b_tree_reduction(int* a) {
   for (std::size_t k = (THREADS_PER_BLOCK / 2); k > 0; k = k / 2) {
   
     if (threadIdx.x < k) {
@@ -28,7 +28,7 @@ __device__ void b_tree_reduction(int* a) {
   }
 }
 
-__device__ void b_set_partition_descriptor(volatile PartitionDescriptor* partDesc, int aggregate) {
+__device__ __forceinline__ void b_set_partition_descriptor( PartitionDescriptor* partDesc, int aggregate) {
   if (blockIdx.x != 0) {
     partDesc->aggregate = aggregate;       
     __threadfence();
@@ -42,15 +42,15 @@ __device__ void b_set_partition_descriptor(volatile PartitionDescriptor* partDes
   }
 }
 
-__device__ void b_get_exclusive_prefix(volatile PartitionDescriptor* states, int* exclusive_prefix_location) {
+__device__ __forceinline__ void b_get_exclusive_prefix_old( PartitionDescriptor* states, int* exclusive_prefix_location) {
   int exclusive_prefix = 0;
   int end_index = blockIdx.x - WINDOW;
   if (end_index < 0) end_index = 0;
-  volatile PartitionDescriptor *end = &states[end_index];
+   PartitionDescriptor *end = &states[end_index];
   bool done = false;
   while (!done) {
     exclusive_prefix = 0;
-    volatile PartitionDescriptor *currState = &states[blockIdx.x];
+     PartitionDescriptor *currState = &states[blockIdx.x];
 
     while (currState != end) {
       currState--;
@@ -73,7 +73,7 @@ __device__ void b_get_exclusive_prefix(volatile PartitionDescriptor* states, int
   *exclusive_prefix_location = exclusive_prefix;
 }
 
-__device__ void b_get_exclusive_prefix_new(volatile PartitionDescriptor* states, int* exclusive_prefix_location) {
+__device__ __forceinline__ void b_get_exclusive_prefix(PartitionDescriptor* states, int* exclusive_prefix_location) {
   if (blockIdx.x > 0) {
     *exclusive_prefix_location = 0;
     int exclusive_prefix = 0;
@@ -88,7 +88,7 @@ __device__ void b_get_exclusive_prefix_new(volatile PartitionDescriptor* states,
       auto not_break_loop = true;
       while (i <= WINDOW && blockIdx.x - i >= 0 &&
              not_break_loop) {
-        volatile PartitionDescriptor *currState = &states[blockIdx.x - i];
+        PartitionDescriptor *currState = &states[blockIdx.x - i];
         // unsafe
         {
           flag = currState->flag;
@@ -107,7 +107,7 @@ __device__ void b_get_exclusive_prefix_new(volatile PartitionDescriptor* states,
           not_break_loop = false;
           not_done = false;
         }
-        i = i - 1;
+        i = i + 1;
       }
     }
     *exclusive_prefix_location = exclusive_prefix;
@@ -129,7 +129,7 @@ __device__ void b_get_exclusive_prefix_new(volatile PartitionDescriptor* states,
 //   }
 // }
 
-__device__ void b_scan(int* a) {
+__device__ __forceinline__ void b_scan(int* a) {
   const auto foo = a;
   for (std::size_t d = THREADS_PER_BLOCK; d > 0; d = d / 2) {
     if (threadIdx.x < d) {

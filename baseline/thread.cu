@@ -3,7 +3,7 @@
 #include "../shared/shared.cuh"
 #include "params.cuh"
 
-__device__ void t_mem_cpy(int* dest, int* src) {
+__device__ __forceinline__ void t_mem_cpy(int* dest, int* src) {
     // Copy into shared
     // TODO do stride things for perfomance
     for (int i = 0; i < ITEMS_PER_THREAD; i++) {
@@ -11,7 +11,7 @@ __device__ void t_mem_cpy(int* dest, int* src) {
     } 
 }
 
-__device__ int t_tree_reduction(int* a) {
+__device__ __forceinline__ int t_tree_reduction(int* a) {
   int sum = a[0];
   for (int i = 1; i < ITEMS_PER_THREAD; i++) {
     sum = bin_op(sum, a[i]);
@@ -19,13 +19,13 @@ __device__ int t_tree_reduction(int* a) {
   return sum;
 }
 
-__device__ void t_bin_op(int* dest, int* src, int addValue) {
+__device__ __forceinline__ void t_bin_op(int* dest, int* src, int addValue) {
   for (int i = 0; i < ITEMS_PER_THREAD; i++) {
     dest[i] = bin_op(src[i], addValue);
   }
 }
 
-__device__ void t_scan(int* a, int len) {
+__device__ __forceinline__ void t_scan(int* a, int len) {
   int *currDest = a;
   int *currSrc = a;
 
