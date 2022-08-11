@@ -3,8 +3,6 @@
 #include "main.cuh"
 #include <cstdio>
 
-__device__ __forceinline__ __host__ int bin_op(int a, int b) { return a + b; }
-
 // CURSED ONE-File
 void scan_host(int *dest, int *src, int n) {
   int *currDest = dest;
@@ -16,7 +14,7 @@ void scan_host(int *dest, int *src, int n) {
   // Moving the pointers through the array and using the last value to calc the
   // next value
   do {
-    int nextVal = bin_op(*(++currSrc), *currDest);
+    int nextVal = *(++currSrc) + *currDest;
     *(++currDest) = nextVal;
   } while (currDest != &dest[n]);
 }
@@ -58,7 +56,7 @@ __global__ void scan_kernel(int* input, int* flag, int* agg, int* prefix) {
       // t_mem_cpy(t_ptr_shared_input, t_ptr_input);
 			int sum = t_ptr_shared_input[0];
 			for (int i = 1; i < ITEMS_PER_THREAD; i++) {
-				sum = bin_op(sum, t_ptr_shared_input[i]);
+				sum = sum+ t_ptr_shared_input[i];
 			} 
 			*t_ptr_shared_reduction = sum;
 		}
@@ -114,9 +112,6 @@ __global__ void scan_kernel(int* input, int* flag, int* agg, int* prefix) {
 						not_break_loop = false;
 					}
 					if (t_flag == 1) {
-						if (t_agg != 1024) {
-							printf("BAD\n");
-						}
 						exclusive_prefix += t_agg;
 					}
 					if (t_flag == 2) {
@@ -132,7 +127,7 @@ __global__ void scan_kernel(int* input, int* flag, int* agg, int* prefix) {
 
     if (!threadIdx.x && blockIdx.x != 0) {
       // TODO move to function
-      prefix[blockIdx.x] = bin_op(b_ptr_shared_reduction[0], agg[blockIdx.x]);       
+      prefix[blockIdx.x] = b_ptr_shared_reduction[0] + agg[blockIdx.x];       
       __threadfence();
       flag[blockIdx.x] = 2;
     }
@@ -183,15 +178,15 @@ __global__ void scan_kernel(int* input, int* flag, int* agg, int* prefix) {
     {
       if (blockIdx.x == 0) {
         for (int i = 0; i < ITEMS_PER_THREAD; i++) {
-          t_ptr_input[i] = bin_op(t_ptr_input[i], t_ptr_shared_input[i]);
+          t_ptr_input[i] = t_ptr_input[i] + t_ptr_shared_input[i];
         }
       } else {
         // TODO fix global colleasing
         for (int i = 0; i < ITEMS_PER_THREAD; i++) {
-          t_ptr_input[i] = bin_op(t_ptr_input[i], t_ptr_shared_input[i]);
+          t_ptr_input[i] = t_ptr_input[i] + t_ptr_shared_input[i];
         }
 				for (int i = 0; i < ITEMS_PER_THREAD; i++) {
-					t_ptr_input[i] = bin_op(t_ptr_input[i], b_ptr_shared_reduction[0]);
+					t_ptr_input[i] = t_ptr_input[i] + b_ptr_shared_reduction[0];
 				}
 			}
     }
@@ -218,7 +213,7 @@ Result exec() {
 	}
 
 	for (int i = 0; i < AMOUNT_ELEMS; i++) {
-		c_input[i] = 1;
+		c_input[i] = i % 11 + 1; //% 3;
 	}
 
   int *gold = (int *)malloc(SIZE_OF_INPUT);
