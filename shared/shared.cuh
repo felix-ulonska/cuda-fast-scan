@@ -16,9 +16,9 @@
 // MAYBE Optimize Struct to enable collalcasing
 typedef struct {
   // Allowed values are FLAG_BLOCK, FLAG_INCLUSIVE_PREFIX, FLAG_AGGREGATE
-  int flag;
-  int aggregate;
-  int inclusive_prefix;
+  int* flag;
+  int* aggregate;
+  int* inclusive_prefix;
 } PartitionDescriptor;
 
 void print_motd();

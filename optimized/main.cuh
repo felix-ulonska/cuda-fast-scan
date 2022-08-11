@@ -6,6 +6,7 @@
 #define AMOUNT_ELEMS ITEMS_PER_BLOCK * AMOUNT_BLOCKS
 #define SIZE_OF_INPUT sizeof(int) * AMOUNT_BLOCKS * ITEMS_PER_BLOCK
 #define SIZE_OF_PARTITION_DESCRIPTIORS sizeof(PartitionDescriptor) * AMOUNT_BLOCKS
+#define SIZE_OF_STATUS_ARRS sizeof(int) * AMOUNT_BLOCKS
 
 typedef struct {
   float time;
