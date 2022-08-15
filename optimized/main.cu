@@ -191,11 +191,8 @@ __global__ void scan_kernel(int* const input, int* const flag, int* const agg, i
       } else {
         // TODO fix global colleasing
         for (int i = 0; i < ITEMS_PER_THREAD; i++) {
-          b_shared_input_bkp[(threadIdx.x * ITEMS_PER_THREAD) + i] = t_ptr_input[i] + t_ptr_shared_input[i];
+          t_ptr_input[i] = b_shared_input_bkp[(threadIdx.x * ITEMS_PER_THREAD) + i] + t_ptr_shared_input[i] + b_ptr_shared_reduction[0];
         }
-				for (int i = 0; i < ITEMS_PER_THREAD; i++) {
-					t_ptr_input[i] = b_shared_input_bkp[(threadIdx.x * ITEMS_PER_THREAD) + i] + b_ptr_shared_reduction[0];
-				}
 			}
     }
 	}
