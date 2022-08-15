@@ -32,33 +32,40 @@ bool arr_equal(int *a, int *b, int n) {
   return !bad;
 }
 
-__global__ void scan_kernel(int* input, int* flag, int* agg, int* prefix) {
-  extern __shared__ int s[];
+__global__ void scan_kernel(int* const input, int* const flag, int* const agg, int* const prefix) {
+  __shared__ int b_shared_input_bkp[sizeof(int) * ITEMS_PER_BLOCK];
+  __shared__ int s[sizeof(int) * (THREADS_PER_BLOCK + ITEMS_PER_BLOCK + 100)];
+
+  
 
   // Parfor block
   {
-    int* b_ptr_input = &input[ITEMS_PER_BLOCK * blockIdx.x];
-    int* b_ptr_shared_reduction = &s[0];
-    int* b_ptr_shared_input_copy = &s[blockDim.x];
+    int* const b_ptr_input = &input[ITEMS_PER_BLOCK * blockIdx.x];
+    int* const b_ptr_shared_reduction = &s[0];
+    int* const b_ptr_shared_input_copy = &s[THREADS_PER_BLOCK];
 
-    for (int i = 0; i < ITEMS_PER_BLOCK; i += blockDim.x) {
-      b_ptr_shared_input_copy[i + threadIdx.x] = b_ptr_input[i + threadIdx.x];
+    //for (int i = 0; i < ITEMS_PER_BLOCK; i += blockDim.x) {
+    //  b_ptr_shared_input_copy[i + threadIdx.x] = b_ptr_input[i + threadIdx.x];
+    //}
+    for (int i = 0; i < ITEMS_PER_THREAD; i += 1) {
+      b_ptr_shared_input_copy[i + (threadIdx.x * ITEMS_PER_THREAD)] = b_ptr_input[i + (threadIdx.x * ITEMS_PER_THREAD)];
+      b_shared_input_bkp[i + (threadIdx.x * ITEMS_PER_THREAD)] = b_ptr_input[i + (threadIdx.x * ITEMS_PER_THREAD)];
     }
     __syncthreads();
 
 
     // Parfor thread in block
-    int* t_ptr_input = &b_ptr_input[threadIdx.x * ITEMS_PER_THREAD];
-    int* t_ptr_shared_reduction = &b_ptr_shared_reduction[threadIdx.x];
-    int* t_ptr_shared_input = &b_ptr_shared_input_copy[threadIdx.x * ITEMS_PER_THREAD];
+    int* const t_ptr_input = &b_ptr_input[threadIdx.x * ITEMS_PER_THREAD];
+    int* const t_ptr_shared_reduction = &b_ptr_shared_reduction[threadIdx.x];
+    int* const t_ptr_shared_input = &b_ptr_shared_input_copy[threadIdx.x * ITEMS_PER_THREAD];
     // PARFOR THREAD
     {
       // t_mem_cpy(t_ptr_shared_input, t_ptr_input);
-			int sum = t_ptr_shared_input[0];
-			for (int i = 1; i < ITEMS_PER_THREAD; i++) {
-				sum = sum+ t_ptr_shared_input[i];
-			} 
-			*t_ptr_shared_reduction = sum;
+		int sum = t_ptr_shared_input[0];
+		for (int i = 1; i < ITEMS_PER_THREAD; i++) {
+			sum = sum+ t_ptr_shared_input[i];
+		} 
+		*t_ptr_shared_reduction = sum;
 		}
 		__syncthreads();
 
@@ -86,7 +93,8 @@ __global__ void scan_kernel(int* input, int* flag, int* agg, int* prefix) {
 		}
 		__syncthreads();
 
-		int* exclusive_prefix_location = &b_ptr_shared_reduction[0];
+		int* const exclusive_prefix_location = &b_ptr_shared_reduction[0];
+		const auto blockId = blockIdx.x;
 		if (blockIdx.x > 0 && threadIdx.x == 0) {
 			*exclusive_prefix_location = 0;
 			int exclusive_prefix = 0;
@@ -99,14 +107,14 @@ __global__ void scan_kernel(int* input, int* flag, int* agg, int* prefix) {
 				auto t_agg = 0;
 				auto t_prefix = 0;
 				auto not_break_loop = true;
-				while (i <= WINDOW && blockIdx.x - i >= 0 &&
+				while (i <= WINDOW && blockId - i >= 0 &&
 							 not_break_loop) {
 					// unsafe
 					{
-						t_flag = flag[blockIdx.x - i];
+						t_flag = flag[blockId - i];
 						__threadfence();
-						t_agg = agg[blockIdx.x - i];
-						t_prefix = prefix[blockIdx.x - i];
+						t_agg = agg[blockId - i];
+						t_prefix = prefix[blockId - i];
 					}
 					if (t_flag == 0) {
 						not_break_loop = false;
@@ -183,10 +191,10 @@ __global__ void scan_kernel(int* input, int* flag, int* agg, int* prefix) {
       } else {
         // TODO fix global colleasing
         for (int i = 0; i < ITEMS_PER_THREAD; i++) {
-          t_ptr_input[i] = t_ptr_input[i] + t_ptr_shared_input[i];
+          b_shared_input_bkp[(threadIdx.x * ITEMS_PER_THREAD) + i] = t_ptr_input[i] + t_ptr_shared_input[i];
         }
 				for (int i = 0; i < ITEMS_PER_THREAD; i++) {
-					t_ptr_input[i] = t_ptr_input[i] + b_ptr_shared_reduction[0];
+					t_ptr_input[i] = b_shared_input_bkp[(threadIdx.x * ITEMS_PER_THREAD) + i] + b_ptr_shared_reduction[0];
 				}
 			}
     }
@@ -246,7 +254,7 @@ Result exec() {
   cudaEventCreate(&stop);
 
   cudaEventRecord(start);
-  scan_kernel<<<AMOUNT_BLOCKS, THREADS_PER_BLOCK, sizeof(int) * (THREADS_PER_BLOCK + ITEMS_PER_BLOCK) * 2>>>
+  scan_kernel<<<AMOUNT_BLOCKS, THREADS_PER_BLOCK>>>
 		(g_input, g_flag, g_agg, g_prefix);
   cudaEventRecord(stop);
 
