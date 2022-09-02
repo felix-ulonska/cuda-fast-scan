@@ -27,13 +27,13 @@ void scan_host(int *dest, int *src, int n) {
   } while (currDest != &dest[n]);
 }
 
-bool arr_equal(int *a, int *b, int n) {
+bool arr_equal(int *gold, int *test, int n) {
   bool bad = false;
   for (int i = 0; i < n; i++) {
-    if (abs(a[i] - b[i]) > 0.3) {
-      std::cout << "I: " << i << " First val: " << a[i] << " Second Val" << b[i]
+    if (abs(gold[i] - test[i]) > 0.1) {
+      std::cout << "I: " << i << " gold: " << gold[i] << " test: " << test[i]
                 << std::endl;
-      return false;
+      //return false;
       bad = true;
     }
   }
@@ -46,7 +46,7 @@ bool arr_equal(int *a, int *b, int n) {
 __global__ void scan_kernel(int *const input, int *const flag, int *const agg,
                             int *const prefix) {
   __shared__ int b_shared_input_bkp[sizeof(int) * ITEMS_PER_BLOCK];
-  __shared__ int s[sizeof(int) * (THREADS_PER_BLOCK + ITEMS_PER_BLOCK + 100)];
+  __shared__ int s[sizeof(int) * (THREADS_PER_BLOCK + ITEMS_PER_BLOCK)];
 
   // Parfor block
   {
@@ -156,10 +156,10 @@ __global__ void scan_kernel(int *const input, int *const flag, int *const agg,
     // == calculate prefixsum for block ==
     for (std::size_t d = THREADS_PER_BLOCK; d > 0; d = d / 2) {
       if (threadIdx.x < d) {
-        const auto baseThread = &b_ptr_shared_input_copy[threadIdx.x * (ITEMS_PER_BLOCK / d)];
-        const auto r = &baseThread[(ITEMS_PER_BLOCK / d) - 1];
-        const auto l = &baseThread[((THREADS_PER_BLOCK / d) - 1)];
-        *r += *l; 
+        auto baseThread = &b_ptr_shared_input_copy[threadIdx.x * (ITEMS_PER_BLOCK / d)];
+        auto r = &baseThread[(ITEMS_PER_BLOCK / d) - 1];
+        auto l = &baseThread[((THREADS_PER_BLOCK / d) - 1)];
+        *r = *r + *l; 
       }
       __syncthreads();
     }
@@ -174,7 +174,7 @@ __global__ void scan_kernel(int *const input, int *const flag, int *const agg,
         const auto baseThread = &b_ptr_shared_input_copy[threadIdx.x * (ITEMS_PER_BLOCK / d)];
         const auto r = &baseThread[(ITEMS_PER_BLOCK / d) - 1];
         const auto l = &baseThread[((THREADS_PER_BLOCK / d) - 1)];
-        const auto t = *r;
+        const auto t = *l;
         *l = *r;
         *r += t;
       }
@@ -187,7 +187,7 @@ __global__ void scan_kernel(int *const input, int *const flag, int *const agg,
     {
       if (blockIdx.x == 0) {
         for (int i = 0; i < ITEMS_PER_THREAD; i++) {
-          t_ptr_input[i] = t_ptr_input[i] + t_ptr_shared_input[i];
+          t_ptr_input[i] = b_shared_input_bkp[(threadIdx.x * ITEMS_PER_THREAD) + i] + t_ptr_shared_input[i];
         }
       } else {
         for (int i = 0; i < ITEMS_PER_THREAD; i++) {
@@ -221,7 +221,9 @@ Result exec() {
   }
 
   for (int i = 0; i < AMOUNT_ELEMS; i++) {
-    c_input[i] = i % 11 + 1; //% 3;
+
+    // Value with modulo to prevent that blocks all have the same values
+    c_input[i] = i % 11 + 1;
   }
 
   int *gold = (int *)malloc(SIZE_OF_INPUT);
