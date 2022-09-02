@@ -4,9 +4,10 @@ CUDA_OPTIONS = --relocatable-device-code=true
 BUILD_DIR = build
 BUILD_DIR_BASELINE = $(BUILD_DIR)/baseline
 BUILD_DIR_SHARED = $(BUILD_DIR)/shared
+BUILD_DIR_OPTIMIZED = $(BUILD_DIR)/optimized
 BIN_DIR = bin
 
-.phony = clean runBaseline runCheck format
+.phony = clean runBaseline runCheck format runOptimized
 
 .DEFAULT_GOAL := $(BIN_DIR)/baseline 
 
@@ -24,6 +25,15 @@ $(BIN_DIR)/baseline: $(BUILD_DIR_BASELINE)/main.o $(BUILD_DIR_BASELINE)/device.o
 
 runBaseline: ${BIN_DIR}/baseline
 	./$^
+
+$(BIN_DIR)/optimized: optimized/*
+	mkdir -p bin
+	$(NVCC) optimized/main.cu -o $@
+
+runOptimized: ${BIN_DIR}/optimized
+	${BIN_DIR}/optimized
+
+	
 
 runCheck: ${BIN_DIR}/baseline
 	@echo "[+] Running memcheck"
