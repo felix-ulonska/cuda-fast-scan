@@ -145,15 +145,11 @@ __global__ void scan_kernel(int *const input, int *const flag, int *const agg,
     const auto foo = b_ptr_shared_input_copy;
     for (std::size_t d = THREADS_PER_BLOCK; d > 0; d = d / 2) {
       if (threadIdx.x < d) {
-        (&(*foo))[(
-            ((threadIdx.x - 0) * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
-            (((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d) - 1))] =
-            (&(*foo))[(((threadIdx.x - 0) *
-                        ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
-                       (((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d) - 1))] +
-            (&(*foo))[(((threadIdx.x - 0) *
-                        ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
-                       ((THREADS_PER_BLOCK / d) - 1))];
+        const auto baseThread = &foo[threadIdx.x * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)];
+        //const auto t_ptr = &baseThread[(threadIdx.x * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d))];
+        baseThread[((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d) - 1] +=
+            baseThread[((THREADS_PER_BLOCK / d) - 1)];
+        baseThread[0] = 100;
       }
       __syncthreads();
     }

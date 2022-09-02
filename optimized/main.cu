@@ -62,7 +62,6 @@ __global__ void scan_kernel(int *const input, int *const flag, int *const agg,
         &b_ptr_shared_input_copy[threadIdx.x * ITEMS_PER_THREAD];
     // PARFOR THREAD
     {
-      // t_mem_cpy(t_ptr_shared_input, t_ptr_input);
       int sum = t_ptr_shared_input[0];
       for (int i = 1; i < ITEMS_PER_THREAD; i++) {
         sum = sum + t_ptr_shared_input[i];
@@ -145,44 +144,27 @@ __global__ void scan_kernel(int *const input, int *const flag, int *const agg,
     const auto foo = b_ptr_shared_input_copy;
     for (std::size_t d = THREADS_PER_BLOCK; d > 0; d = d / 2) {
       if (threadIdx.x < d) {
-        (&(*foo))[(
-            ((threadIdx.x - 0) * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
-            (((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d) - 1))] =
-            (&(*foo))[(((threadIdx.x - 0) *
-                        ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
-                       (((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d) - 1))] +
-            (&(*foo))[(((threadIdx.x - 0) *
-                        ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
-                       ((THREADS_PER_BLOCK / d) - 1))];
+        const auto baseThread = &foo[threadIdx.x * (ITEMS_PER_BLOCK / d)];
+        const auto r = &baseThread[(ITEMS_PER_BLOCK / d) - 1];
+        const auto l = &baseThread[((THREADS_PER_BLOCK / d) - 1)];
+        *r += *l; 
       }
       __syncthreads();
     }
 
     if (threadIdx.x < 1) {
-      foo[((threadIdx.x - 0) + ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) - 1))] =
-          0;
+      foo[ITEMS_PER_BLOCK - 1] = 0;
     }
     __syncthreads();
 
     for (std::size_t d = 1; d <= THREADS_PER_BLOCK; d = d * 2) {
-
       if (threadIdx.x < d) {
-        const auto t = (&(*foo))[(
-            ((threadIdx.x - 0) * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
-            ((THREADS_PER_BLOCK / d) - 1))];
-        (&(*foo))[(
-            ((threadIdx.x - 0) * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
-            ((THREADS_PER_BLOCK / d) - 1))] =
-            (&(*foo))[(((threadIdx.x - 0) *
-                        ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
-                       (((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d) - 1))];
-        (&(*foo))[(
-            ((threadIdx.x - 0) * ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
-            (((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d) - 1))] =
-            (&(*foo))[(((threadIdx.x - 0) *
-                        ((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d)) +
-                       (((THREADS_PER_BLOCK * ITEMS_PER_THREAD) / d) - 1))] +
-            t;
+        const auto baseThread = &foo[threadIdx.x * (ITEMS_PER_BLOCK / d)];
+        const auto r = &baseThread[(ITEMS_PER_BLOCK / d) - 1];
+        const auto l = &baseThread[((THREADS_PER_BLOCK / d) - 1)];
+        const auto t = *r;
+        *l = *r;
+        *r += t;
       }
       __syncthreads();
     }
@@ -306,18 +288,18 @@ int main() {
 
   int sum = 0;
   FILE *fp;
-  if ((fp = fopen(CSV_OUTPUT_PATH, "w")) == NULL) {
-    printf("cannot open.\n");
-    exit(1);
-  }
+  //if ((fp = fopen(CSV_OUTPUT_PATH, "w")) == NULL) {
+  //  printf("cannot open.\n");
+  //  exit(1);
+  //}
 
-  for (int i = 0; i < iters; i++) {
-    float time = results[i].time;
-    sum += time;
-    std::fprintf(fp, "%f,\n", time);
-    // printf("time: %f\n", time);
-  }
-  std::fclose(fp);
+  //for (int i = 0; i < iters; i++) {
+  //  float time = results[i].time;
+  //  sum += time;
+  //  std::fprintf(fp, "%f,\n", time);
+  //  // printf("time: %f\n", time);
+  //}
+  //std::fclose(fp);
 
   printf("success\n");
 }
